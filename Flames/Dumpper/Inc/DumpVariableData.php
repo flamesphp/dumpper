@@ -13,38 +13,36 @@ use Flames\Dumpper\Inc\DumpParser;
 class DumpVariableData
 {
     /** @var string|null PHP type label */
-    public $type;
+    public ?string $type = null;
+
     /** @var string|null access modifier (public / protected / private) */
-    public $access;
-    /** @var string|null variable or property name */
-    public $name;
+    public ?string $access = null;
+
+    /** @var int|string|null variable or property name */
+    public int|string|null $name = null;
+
     /** @var string|null operator shown between name and type (=> or ->) */
-    public $operator;
+    public ?string $operator = null;
+
     /** @var int|string|null element count or "enum" */
-    public $size;
+    public int|string|null $size = null;
+
     /** @var array|string|null full expanded representation */
-    public $extendedValue;
-    /** @var string|null short inline value */
-    public $value;
+    public array|string|null $extendedValue = null;
+
+    /** @var int|float|string|null short inline value */
+    public int|float|string|null $value = null;
 
     /** @var array<string, string|array> extra tab views shown in rich mode */
-    private $alternativeRepresentations = array();
+    private array $alternativeRepresentations = [];
 
     /**
      * Adds an additional tab view for the same variable data (rich mode only).
-     *
-     * @param mixed        $originalVariable the variable being parsed (used for recursion detection)
-     * @param string       $tabName          label displayed on the tab
-     * @param string|array $value            tab contents
-     *
-     * @return void
      */
-    public function addTabToView($originalVariable, $tabName, $value)
+    public function addTabToView(mixed $originalVariable, string $tabName, mixed $value): void
     {
-        if (is_array($value)) {
-            if (!(reset($value) instanceof self)) {
-                $value = DumpParser::alternativesParse($originalVariable, $value);
-            }
+        if (is_array($value) && !(reset($value) instanceof self)) {
+            $value = DumpParser::alternativesParse($originalVariable, $value);
         }
 
         $this->alternativeRepresentations[$tabName] = $value;
@@ -55,9 +53,9 @@ class DumpVariableData
      *
      * @return array<string, mixed>
      */
-    public function getAllRepresentations()
+    public function getAllRepresentations(): array
     {
-        $prepared = array();
+        $prepared = [];
 
         if (!empty($this->extendedValue)) {
             $prepared['Contents'] = $this->extendedValue;

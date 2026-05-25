@@ -32,11 +32,12 @@ class Dump
         }
         return self::$_dir;
     }
-    private static $_enabledMode = true;
-    private static $_openedOutput;
+
+    private static mixed $_enabledMode = true;
+    private static mixed $_openedOutput = null;
 
     /**
-     * @var string makes visible source file paths clickable to open your editor.
+     * @var string|null makes visible source file paths clickable to open your editor.
      *
      * Pre-defined values:
      *   'sublime'                => 'subl://open?url=file://%file&line=%line',
@@ -59,126 +60,99 @@ class Dump
      * Or pass a custom string where %file should be replaced with full file path, %line with line number.
      * Set to null to disable linking.
      */
-    public static $editor;
+    public static mixed $editor = null;
+
+    /** @var string|null the full path (not URL) to your project folder on your remote dev server. */
+    public static ?string $fileLinkServerPath = null;
+
+    /** @var string|null the full path (not URL) to your project on your local machine. */
+    public static ?string $fileLinkLocalPath = null;
+
+    /** @var bool|null whether to display where Dump was called from. */
+    public static ?bool $displayCalledFrom = null;
+
+    /** @var int|false max array/object levels to go deep, set to zero/false to disable. */
+    public static int|false $maxLevels = 20;
+
+    /** @var bool|null draw rich output already expanded without having to click. */
+    public static ?bool $expandedByDefault = null;
+
+    /** @var bool|null enable detection when running in command line and adjust output format accordingly. */
+    public static ?bool $cliDetection = null;
+
+    /** @var bool|null enable ANSI colors in *UNIX* CLI mode. */
+    public static ?bool $cliColors = null;
+
+    /** @var array|null possible alternative char encodings in order of probability. */
+    public static ?array $charEncodings = null;
 
     /**
-     * @var string the full path (not URL) to your project folder on your remote dev server.
-     */
-    public static $fileLinkServerPath;
-
-    /**
-     * @var string the full path (not URL) to your project on your local machine.
-     */
-    public static $fileLinkLocalPath;
-
-    /**
-     * @var bool whether to display where Dump was called from.
-     */
-    public static $displayCalledFrom;
-
-    /**
-     * @var int max array/object levels to go deep, set to zero/false to disable.
-     */
-    public static $maxLevels = 20;
-
-    /**
-     * @var bool draw rich output already expanded without having to click.
-     */
-    public static $expandedByDefault;
-
-    /**
-     * @var bool enable detection when running in command line and adjust output format accordingly.
-     */
-    public static $cliDetection;
-
-    /**
-     * @var bool enable ANSI colors in *UNIX* CLI mode.
-     */
-    public static $cliColors;
-
-    /**
-     * @var array possible alternative char encodings in order of probability.
-     */
-    public static $charEncodings;
-
-    /**
-     * @var bool|string Dump returns output instead of echo.
+     * @var bool|string|null Dump returns output instead of echo.
      *
      * If true, the return has scripts+css always included,
      * if set to a string, only first time per "group".
      */
-    public static $returnOutput;
+    public static bool|string|null $returnOutput = null;
 
-    /**
-     * @var string Write output to this file instead of echoing it.
-     * If it ends in `.html` forces output in html mode.
-     */
-    public static $outputFile;
+    /** @var string|null Write output to this file instead of echoing it. */
+    public static ?string $outputFile = null;
 
-    /**
-     * @var array Add new custom Dump wrapper names for nice backtraces and variable name detection.
-     *
-     * Use notation `Class::method` for methods.
-     */
-    public static $aliases = array();
+    /** @var array Add new custom Dump wrapper names for nice backtraces and variable name detection. */
+    public static array $aliases = [];
 
-    /**
-     * @var string[] trace path blacklist patterns (regex). Keys don't matter, but can be used to unset entries.
-     */
-    public static $traceBlacklist = array(
+    /** @var string[] trace path blacklist patterns (regex). */
+    public static array $traceBlacklist = [
         'vendor'     => '#\/vendor\/#',
         'middleware' => '#\/Middleware\/#',
-    );
+    ];
 
-    public static $classNameBlacklist = array(
+    public static array $classNameBlacklist = [
         'illuminate' => '/^Illuminate(?!.*(?:Exception|Collection))/',
-    );
+    ];
 
-    public static $arrayKeysBlacklist = array();
+    public static array $arrayKeysBlacklist = [];
 
-    public static $minimumTraceStepsToShowFull = 1;
+    public static int $minimumTraceStepsToShowFull = 1;
 
-    /** @var class-string<DumpParser>[] */
-    public static $enabledParsers = array(
-        'DumpParsersFlamesModel'    => true,
-        'DumpParsersSmarty'         => true,
-        'DumpParsersSplFileInfo'    => true,
-        'DumpParsersClosure'        => true,
-        'DumpParsersEloquent'       => true,
-        'DumpParsersDateTime'       => true,
-        'DumpParsersSplObjectStorage' => true,
-        'DumpParsersTimestamp'      => true,
-        'DumpParsersFilePath'       => true,
-        'DumpParsersBlacklist'      => true,
-        'DumpParsersXml'            => true,
+    /** @var array<string, bool> */
+    public static array $enabledParsers = [
+        'DumpParsersFlamesModel'       => true,
+        'DumpParsersSmarty'            => true,
+        'DumpParsersSplFileInfo'       => true,
+        'DumpParsersClosure'           => true,
+        'DumpParsersEloquent'          => true,
+        'DumpParsersDateTime'          => true,
+        'DumpParsersSplObjectStorage'  => true,
+        'DumpParsersTimestamp'         => true,
+        'DumpParsersFilePath'          => true,
+        'DumpParsersBlacklist'         => true,
+        'DumpParsersXml'               => true,
         'DumpParsersObjectIterateable' => true,
-        'DumpParsersClassStatics'   => true,
-        'DumpParsersColor'          => true,
-        'DumpParsersJson'           => true,
-        'DumpParsersClassName'      => true,
-        'DumpParsersMicrotime'      => true,
-    );
+        'DumpParsersClassStatics'      => true,
+        'DumpParsersColor'             => true,
+        'DumpParsersJson'              => true,
+        'DumpParsersClassName'         => true,
+        'DumpParsersMicrotime'         => true,
+    ];
 
     const MODE_RICH      = 'r';
     const MODE_TEXT_ONLY = 'w';
     const MODE_CLI       = 'c';
     const MODE_PLAIN     = 'p';
 
-    /** @var bool */
-    public static $simplifyDisplay = false;
+    public static bool $simplifyDisplay = false;
+
+    private static int $loadedParsers = 0;
 
     /**
      * Saves or restores the complete Dump state (used internally for test isolation).
-     *
-     * @param array $state Pass a previously-saved state to restore; omit to capture.
-     * @return array|void
      */
-    public static function saveState($state = array())
+    public static function saveState(?array $state = null): ?array
     {
         $rich  = new DumpDecoratorsRich();
         $plain = new DumpDecoratorsPlain();
 
-        if (func_num_args()) {
+        if ($state !== null) {
             self::$_enabledMode       = $state['enabled'];
             self::$editor             = $state['editor'];
             self::$fileLinkServerPath = $state['fileLinkServerPath'];
@@ -199,43 +173,43 @@ class Dump
             $rich->setAssetsNeeded($state['DumpDecoratorsRich::firstRun']);
             $plain->setAssetsNeeded($state['DumpDecoratorsPlain::firstRun']);
 
-            return;
+            return null;
         }
 
-        return array(
-            'enabled'                      => self::$_enabledMode,
-            'editor'                       => self::$editor,
-            'fileLinkServerPath'           => self::$fileLinkServerPath,
-            'fileLinkLocalPath'            => self::$fileLinkLocalPath,
-            'displayCalledFrom'            => self::$displayCalledFrom,
-            'maxLevels'                    => self::$maxLevels,
-            'expandedByDefault'            => self::$expandedByDefault,
-            'cliDetection'                 => self::$cliDetection,
-            'cliColors'                    => self::$cliColors,
-            'charEncodings'                => self::$charEncodings,
-            'returnOutput'                 => self::$returnOutput,
-            'outputFile'                   => self::$outputFile,
-            'aliases'                      => self::$aliases,
-            'traceBlacklist'               => self::$traceBlacklist,
-            'classNameBlacklist'           => self::$classNameBlacklist,
-            'enabledParsers'               => self::$enabledParsers,
-            'DumpDecoratorsRich::firstRun' => $rich->areAssetsNeeded(),
-            'DumpDecoratorsPlain::firstRun'=> $plain->areAssetsNeeded(),
-        );
+        return [
+            'enabled'                       => self::$_enabledMode,
+            'editor'                        => self::$editor,
+            'fileLinkServerPath'            => self::$fileLinkServerPath,
+            'fileLinkLocalPath'             => self::$fileLinkLocalPath,
+            'displayCalledFrom'             => self::$displayCalledFrom,
+            'maxLevels'                     => self::$maxLevels,
+            'expandedByDefault'             => self::$expandedByDefault,
+            'cliDetection'                  => self::$cliDetection,
+            'cliColors'                     => self::$cliColors,
+            'charEncodings'                 => self::$charEncodings,
+            'returnOutput'                  => self::$returnOutput,
+            'outputFile'                    => self::$outputFile,
+            'aliases'                       => self::$aliases,
+            'traceBlacklist'                => self::$traceBlacklist,
+            'classNameBlacklist'            => self::$classNameBlacklist,
+            'enabledParsers'                => self::$enabledParsers,
+            'DumpDecoratorsRich::firstRun'  => $rich->areAssetsNeeded(),
+            'DumpDecoratorsPlain::firstRun' => $plain->areAssetsNeeded(),
+        ];
     }
 
     /**
      * Enables or disables Dump, and forces display mode. Also returns currently active mode.
      *
      * @param mixed $forceMode
-     *   null or void  — return current mode
-     *   false         — disable Dump
-     *   true          — enable and auto-detect best formatting
-     *   Dump::MODE_*  — enable and force selected mode
+     *   null      — return current mode
+     *   false     — disable Dump
+     *   true      — enable and auto-detect best formatting
+     *   Dump::MODE_* — enable and force selected mode
      *
      * @return mixed previously set value
      */
-    public static function enabled($forceMode = null)
+    public static function enabled(mixed $forceMode = null): mixed
     {
         if (isset($forceMode)) {
             $before = self::$_enabledMode;
@@ -250,12 +224,11 @@ class Dump
      * Prints a debug backtrace, same as `Dump::dump(1)`.
      *
      * @param array|null $trace custom trace; defaults to debug_backtrace()
-     * @return mixed
      */
-    public static function trace($trace = null)
+    public static function trace(?array $trace = null): mixed
     {
         if ($trace === null) {
-            $trace = DumpHelper::php53orLater() ? debug_backtrace(true) : debug_backtrace();
+            $trace = debug_backtrace(DEBUG_BACKTRACE_PROVIDE_OBJECT);
         }
 
         return self::dump($trace);
@@ -272,13 +245,12 @@ class Dump
      *   +     — expand all nodes
      *   @     — return output instead of echoing
      *
-     * @param mixed $data
      * @return string|int returns 5463 (Dump in l33tspeak) when disabled
      */
-    public static function dump($data = null)
+    public static function dump(mixed ...$args): string|int
     {
         try {
-            return self::doDump(...func_get_args());
+            return self::doDump(...$args);
         } catch (\Throwable $e) {
         }
 
@@ -287,11 +259,8 @@ class Dump
 
     /**
      * Internal implementation of dump(); called after exception guard.
-     *
-     * @param mixed $data
-     * @return string|int
      */
-    public static function doDump($data = null)
+    public static function doDump(mixed ...$args): string|int
     {
         $enabledMode = self::enabled();
 
@@ -301,21 +270,20 @@ class Dump
 
         self::_init();
 
-        list($names, $modifiers, $callee, $previousCaller, $miniTrace) = self::_getCalleeInfo();
+        [$names, $modifiers, $callee, $previousCaller, $miniTrace] = self::_getCalleeInfo();
 
-        // Pre-compute all modifier flags in one pass to avoid repeated strpos calls.
-        $hasMods  = !empty($modifiers);
-        $modPrint = $hasMods && strpos($modifiers, 'print') !== false;
-        $modTilde = $hasMods && strpos($modifiers, '~')     !== false;
-        $modMinus = $hasMods && strpos($modifiers, '-')     !== false;
-        $modPlus  = $hasMods && strpos($modifiers, '+')     !== false;
-        $modBang  = $hasMods && strpos($modifiers, '!')     !== false;
-        $modAt    = $hasMods && strpos($modifiers, '@')     !== false;
+        $hasMods  = $modifiers !== null && $modifiers !== '';
+        $modPrint = $hasMods && str_contains($modifiers, 'print');
+        $modTilde = $hasMods && str_contains($modifiers, '~');
+        $modMinus = $hasMods && str_contains($modifiers, '-');
+        $modPlus  = $hasMods && str_contains($modifiers, '+');
+        $modBang  = $hasMods && str_contains($modifiers, '!');
+        $modAt    = $hasMods && str_contains($modifiers, '@');
 
         if ($enabledMode === true) {
             if ($modPrint && isset($callee['file'])) {
                 $newMode = self::MODE_RICH;
-            } elseif (self::$outputFile && substr(self::$outputFile, -5) === '.html') {
+            } elseif (self::$outputFile && str_ends_with(self::$outputFile, '.html')) {
                 $newMode = self::MODE_RICH;
             } else {
                 $newMode = PHP_SAPI === 'cli' && self::$cliDetection === true
@@ -324,30 +292,27 @@ class Dump
             }
 
             if (self::$simplifyDisplay) {
-                switch ($newMode) {
-                    case self::MODE_RICH: $newMode = self::MODE_PLAIN;     break;
-                    case self::MODE_CLI:  $newMode = self::MODE_TEXT_ONLY; break;
-                }
+                $newMode = match ($newMode) {
+                    self::MODE_RICH => self::MODE_PLAIN,
+                    self::MODE_CLI  => self::MODE_TEXT_ONLY,
+                    default         => $newMode,
+                };
             }
 
             if ($modTilde) {
-                switch ($newMode) {
-                    case self::MODE_RICH:  $newMode = self::MODE_PLAIN;     break;
-                    case self::MODE_PLAIN:
-                    case self::MODE_CLI:   $newMode = self::MODE_TEXT_ONLY; break;
-                }
+                $newMode = match ($newMode) {
+                    self::MODE_RICH               => self::MODE_PLAIN,
+                    self::MODE_PLAIN, self::MODE_CLI => self::MODE_TEXT_ONLY,
+                    default                        => $newMode,
+                };
             }
 
             self::enabled($newMode);
         }
 
-        $decoratorClass = self::enabled() === self::MODE_RICH ? 'DumpDecoratorsRich' : 'DumpDecoratorsPlain';
-
-        if ($decoratorClass === 'DumpDecoratorsRich') {
-            $decorator = new DumpDecoratorsRich();
-        } else {
-            $decorator = new DumpDecoratorsPlain();
-        }
+        $decorator = self::enabled() === self::MODE_RICH
+            ? new DumpDecoratorsRich()
+            : new DumpDecoratorsPlain();
 
         $firstRunOldValue = $decorator->areAssetsNeeded();
 
@@ -390,10 +355,13 @@ class Dump
 
         $trace      = false;
         $lightTrace = false;
-        if (func_num_args() === 1) {
-            if ($names === array('1') && $data === 1) {
-                $trace = DumpHelper::php53orLater() ? debug_backtrace(true) : debug_backtrace();
-            } elseif ($names === array('2') && $data === 2) {
+        $argCount   = count($args);
+        $data       = $args[0] ?? null;
+
+        if ($argCount === 1) {
+            if ($names === ['1'] && $data === 1) {
+                $trace = debug_backtrace(DEBUG_BACKTRACE_PROVIDE_OBJECT);
+            } elseif ($names === ['2'] && $data === 2) {
                 $lightTrace = true;
                 $trace = debug_backtrace();
             } elseif (is_array($data)) {
@@ -414,7 +382,7 @@ class Dump
         if ($trace) {
             $output .= $decorator->decorateTrace($trace, $lightTrace);
         } else {
-            if (func_num_args() === 0) {
+            if ($argCount === 0) {
                 DumpParser::reset();
                 $tmp     = microtime();
                 $varData = DumpParser::process($tmp, '');
@@ -423,16 +391,14 @@ class Dump
                 $varData->size  = null;
                 $varData->name  = 'Dump called with no arguments';
                 if (!empty($callee['function'])) {
-                    if (!empty($callee['class']) && !empty($callee['type'])) {
-                        $name = $callee['class'] . $callee['type'] . $callee['function'];
-                    } else {
-                        $name = $callee['function'];
-                    }
+                    $name = isset($callee['class'], $callee['type'])
+                        ? $callee['class'] . $callee['type'] . $callee['function']
+                        : $callee['function'];
                     $varData->name = $name . '( no parameters )';
                 }
                 $output .= $decorator->decorate($varData);
             } else {
-                foreach (func_get_args() as $k => $argument) {
+                foreach ($args as $k => $argument) {
                     DumpParser::reset();
                     $output .= $decorator->decorate(
                         DumpParser::process($argument, empty($names[$k]) ? '???' : $names[$k])
@@ -497,12 +463,12 @@ class Dump
      *
      * @return array{array, string, array, array, array}
      */
-    private static function _getCalleeInfo()
+    private static function _getCalleeInfo(): array
     {
         $trace                  = debug_backtrace();
-        $previousCaller         = array();
-        $miniTrace              = array();
-        $prevStep               = array();
+        $previousCaller         = [];
+        $miniTrace              = [];
+        $prevStep               = [];
         $insideTemplateDetected = null;
 
         while ($step = array_pop($trace)) {
@@ -514,7 +480,7 @@ class Dump
             if (
                 isset($step['args'][0])
                 && is_string($step['args'][0])
-                && substr($step['args'][0], -strlen('.blade.php')) === '.blade.php'
+                && str_ends_with($step['args'][0], '.blade.php')
             ) {
                 $insideTemplateDetected = $step['args'][0];
             }
@@ -529,7 +495,7 @@ class Dump
         $callee = $step;
 
         if (!isset($callee['file']) || !is_readable($callee['file'])) {
-            return array(null, null, $callee, $previousCaller, $miniTrace);
+            return [null, null, $callee, $previousCaller, $miniTrace];
         }
 
         $file   = fopen($callee['file'], 'r');
@@ -544,11 +510,9 @@ class Dump
         fclose($file);
         $source = self::_removeAllButCode($source);
 
-        if (empty($callee['class'])) {
-            $codePattern = $callee['function'];
-        } else {
-            $codePattern = "\w+\x07*" . $callee['type'] . "\x07*" . $callee['function'];
-        }
+        $codePattern = empty($callee['class'])
+            ? $callee['function']
+            : "\w+\x07*" . $callee['type'] . "\x07*" . $callee['function'];
 
         preg_match_all(
             "
@@ -567,12 +531,12 @@ class Dump
             PREG_OFFSET_CAPTURE
         );
 
-        $modifiers   = end($matches[1]);
-        $callToDump  = end($matches[2]);
-        $bracket     = end($matches[3]);
+        $modifiers  = end($matches[1]);
+        $callToDump = end($matches[2]);
+        $bracket    = end($matches[3]);
 
         if (empty($callToDump)) {
-            return array(array(), $modifiers, $callee, $previousCaller, $miniTrace);
+            return [[], $modifiers, $callee, $previousCaller, $miniTrace];
         }
 
         $modifiers    = str_replace("\x07", '', $modifiers[0]);
@@ -582,8 +546,8 @@ class Dump
         $inString       = $escaped = $openedBracket = $closingBracket = false;
         $i              = 0;
         $inBrackets     = 0;
-        $openedBrackets = array();
-        $bracketPairs   = array('(' => ')', '[' => ']', '{' => '}');
+        $openedBrackets = [];
+        $bracketPairs   = ['(' => ')', '[' => ']', '{' => '}'];
 
         while ($i < $c) {
             $letter = $paramsString[$i];
@@ -633,28 +597,25 @@ class Dump
             $callee['line'] = null;
         }
 
-        return array($names, $modifiers, $callee, $previousCaller, $miniTrace);
+        return [$names, $modifiers, $callee, $previousCaller, $miniTrace];
     }
 
     /**
      * Strips comments and normalises whitespace from PHP source for argument name extraction.
-     *
-     * @param string $source
-     * @return string
      */
-    private static function _removeAllButCode($source)
+    private static function _removeAllButCode(string $source): string
     {
-        $commentTokens = array(
-            T_COMMENT      => true,
-            T_INLINE_HTML  => true,
-            T_DOC_COMMENT  => true,
-        );
-        $whiteSpaceTokens = array(
+        $commentTokens = [
+            T_COMMENT     => true,
+            T_INLINE_HTML => true,
+            T_DOC_COMMENT => true,
+        ];
+        $whiteSpaceTokens = [
             T_WHITESPACE         => true,
             T_CLOSE_TAG          => true,
             T_OPEN_TAG           => true,
             T_OPEN_TAG_WITH_ECHO => true,
-        );
+        ];
 
         $cleanedSource = '';
         foreach (token_get_all($source) as $token) {
@@ -662,11 +623,7 @@ class Dump
                 if (isset($commentTokens[$token[0]])) {
                     continue;
                 }
-                if (isset($whiteSpaceTokens[$token[0]])) {
-                    $token = "\x07";
-                } else {
-                    $token = $token[1];
-                }
+                $token = isset($whiteSpaceTokens[$token[0]]) ? "\x07" : $token[1];
             } elseif ($token === ';') {
                 $token = "\x07";
             }
@@ -680,15 +637,14 @@ class Dump
     /**
      * Validates and converts a raw debug_backtrace() result into DumpTraceStep[].
      *
-     * @param array $data
      * @return DumpTraceStep[]|false
      */
-    private static function _parseTrace($data)
+    private static function _parseTrace(array $data): array|false
     {
-        $trace       = array();
-        $traceFields = array('file', 'line', 'args', 'class');
+        $trace       = [];
+        $traceFields = ['file', 'line', 'args', 'class'];
         $fileFound   = false;
-        $lastStep    = array();
+        $lastStep    = [];
 
         foreach ($data as $step) {
             if (!is_array($step) || !isset($step['function'])) {
@@ -715,11 +671,11 @@ class Dump
 
             if (DumpHelper::stepIsInternal($step)) {
                 if (isset($step['file'], $step['line'])) {
-                    $lastStep = array(
+                    $lastStep = [
                         'file'     => $step['file'],
                         'line'     => $step['line'],
                         'function' => '',
-                    );
+                    ];
                 }
                 continue;
             }
@@ -735,7 +691,7 @@ class Dump
             array_unshift($trace, $lastStep);
         }
 
-        $output = array();
+        $output = [];
         foreach ($trace as $i => $step) {
             $output[] = new DumpTraceStep($step, $i);
         }
@@ -743,26 +699,19 @@ class Dump
         return $output;
     }
 
-    private static $loadedParsers = 0;
-
     /**
      * Called before each invocation; loads parsers and sets defaults on first run.
      */
-    private static function _init()
+    private static function _init(): void
     {
         DumpHelper::buildAliases();
 
-        $parsersCount = 0;
-        foreach (Dump::$enabledParsers as $enabled) {
-            if ($enabled) {
-                $parsersCount++;
-            }
-        }
+        $parsersCount = array_sum(self::$enabledParsers);
 
         if (self::$loadedParsers !== $parsersCount) {
             self::$loadedParsers = $parsersCount;
             $dir = self::dir() . 'Parsers/';
-            foreach (Dump::$enabledParsers as $className => $enabled) {
+            foreach (self::$enabledParsers as $className => $enabled) {
                 if ($enabled) {
                     $f = $dir . $className . '.php';
                     if (file_exists($f)) {
@@ -778,20 +727,15 @@ class Dump
 
         self::$_initialized = true;
 
-        if (!isset(self::$editor)) {
-            self::$editor = ini_get('xdebug.file_link_format') ?: 'phpstorm-remote';
-        }
-        if (!isset(self::$fileLinkServerPath)) { self::$fileLinkServerPath = null; }
-        if (!isset(self::$fileLinkLocalPath))  { self::$fileLinkLocalPath  = null; }
-        if (!isset(self::$displayCalledFrom))  { self::$displayCalledFrom  = true; }
-        if (!isset(self::$maxLevels))          { self::$maxLevels          = 7; }
-        if (!isset(self::$expandedByDefault))  { self::$expandedByDefault  = false; }
-        if (!isset(self::$cliDetection))       { self::$cliDetection       = true; }
-        if (!isset(self::$cliColors))          { self::$cliColors          = true; }
-        if (!isset(self::$charEncodings)) {
-            self::$charEncodings = array('UTF-8', 'Windows-1252', 'euc-jp');
-        }
-        if (!isset(self::$returnOutput)) { self::$returnOutput = false; }
-        if (!isset(self::$aliases))      { self::$aliases      = array(); }
+        self::$editor             ??= ini_get('xdebug.file_link_format') ?: 'phpstorm-remote';
+        self::$fileLinkServerPath ??= null;
+        self::$fileLinkLocalPath  ??= null;
+        self::$displayCalledFrom  ??= true;
+        self::$expandedByDefault  ??= false;
+        self::$cliDetection       ??= true;
+        self::$cliColors          ??= true;
+        self::$charEncodings      ??= ['UTF-8', 'Windows-1252', 'euc-jp'];
+        self::$returnOutput       ??= false;
+        self::$aliases            ??= [];
     }
 }

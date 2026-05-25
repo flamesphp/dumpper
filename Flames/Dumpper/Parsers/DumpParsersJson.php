@@ -12,20 +12,15 @@ use Flames\Dumpper\Parsers\DumpParserInterface;
  */
 class DumpParsersJson implements DumpParserInterface
 {
-    /** @return bool */
-    public function replacesAllOtherParsers()
+    public function replacesAllOtherParsers(): bool
     {
         return false;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function parse(&$variable, $varData)
+    public function parse(mixed &$variable, mixed $varData): mixed
     {
         if (
             !DumpHelper::isRichMode()
-            || !DumpHelper::php53orLater()
             || !is_string($variable)
             || !isset($variable[0])
             || ($variable[0] !== '{' && $variable[0] !== '[')
@@ -40,5 +35,6 @@ class DumpParsersJson implements DumpParserInterface
         }
 
         $varData->addTabToView($variable, 'Json', $val);
+        return null;
     }
 }

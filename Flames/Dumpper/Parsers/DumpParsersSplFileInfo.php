@@ -17,22 +17,14 @@ use SplFileObject;
  */
 class DumpParsersSplFileInfo implements DumpParserInterface
 {
-    /** @return bool */
-    public function replacesAllOtherParsers()
+    public function replacesAllOtherParsers(): bool
     {
         return true;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function parse(&$variable, $varData)
+    public function parse(mixed &$variable, mixed $varData): mixed
     {
-        if (
-            !DumpHelper::php53orLater()
-            || !$variable instanceof SplFileInfo
-            || $variable instanceof SplFileObject
-        ) {
+        if (!$variable instanceof SplFileInfo || $variable instanceof SplFileObject) {
             return false;
         }
 
@@ -41,13 +33,8 @@ class DumpParsersSplFileInfo implements DumpParserInterface
 
     /**
      * Shared logic for DumpParsersSplFileInfo and DumpParsersFilePath.
-     *
-     * @param mixed            $variable
-     * @param DumpVariableData $varData
-     * @param SplFileInfo      $fileInfo
-     * @return bool
      */
-    protected function run(&$variable, $varData, $fileInfo)
+    protected function run(mixed &$variable, mixed $varData, SplFileInfo $fileInfo): mixed
     {
         $varData->value = '"' . DumpHelper::esc($fileInfo->getPathname()) . '"';
         $varData->type  = get_class($fileInfo);
@@ -58,17 +45,17 @@ class DumpParsersSplFileInfo implements DumpParserInterface
         }
 
         try {
-            $flags = array();
+            $flags = [];
             $perms = $fileInfo->getPerms();
 
-            if (($perms & 0xC000) === 0xC000)      { $type = 'File socket';            $flags[] = 's'; }
-            elseif (($perms & 0xA000) === 0xA000)  { $type = 'File symlink';           $flags[] = 'l'; }
-            elseif (($perms & 0x8000) === 0x8000)  { $type = 'File';                   $flags[] = '-'; }
-            elseif (($perms & 0x6000) === 0x6000)  { $type = 'Block special file';     $flags[] = 'b'; }
-            elseif (($perms & 0x4000) === 0x4000)  { $type = 'Directory';              $flags[] = 'd'; }
-            elseif (($perms & 0x2000) === 0x2000)  { $type = 'Character special file'; $flags[] = 'c'; }
-            elseif (($perms & 0x1000) === 0x1000)  { $type = 'FIFO pipe file';         $flags[] = 'p'; }
-            else                                    { $type = 'Unknown file';           $flags[] = 'u'; }
+            if (($perms & 0xC000) === 0xC000)     { $type = 'File socket';            $flags[] = 's'; }
+            elseif (($perms & 0xA000) === 0xA000) { $type = 'File symlink';           $flags[] = 'l'; }
+            elseif (($perms & 0x8000) === 0x8000) { $type = 'File';                   $flags[] = '-'; }
+            elseif (($perms & 0x6000) === 0x6000) { $type = 'Block special file';     $flags[] = 'b'; }
+            elseif (($perms & 0x4000) === 0x4000) { $type = 'Directory';              $flags[] = 'd'; }
+            elseif (($perms & 0x2000) === 0x2000) { $type = 'Character special file'; $flags[] = 'c'; }
+            elseif (($perms & 0x1000) === 0x1000) { $type = 'FIFO pipe file';         $flags[] = 'p'; }
+            else                                   { $type = 'Unknown file';           $flags[] = 'u'; }
 
             $flags[] = (($perms & 0x0100) ? 'r' : '-');
             $flags[] = (($perms & 0x0080) ? 'w' : '-');
@@ -92,7 +79,7 @@ class DumpParsersSplFileInfo implements DumpParserInterface
                 $size = $this->humanFilesize($fileInfo->getSize());
             }
 
-            $extra = array();
+            $extra = [];
             if ($fileInfo->getRealPath() !== $fileInfo->getPathname()) {
                 $extra['realPath'] = $fileInfo->getRealPath();
             }
@@ -111,28 +98,25 @@ class DumpParsersSplFileInfo implements DumpParserInterface
                 }
                 $varData->addTabToView($variable, $name . " [{$size}]", $extra);
             } else {
-                $varData->extendedValue = array($name => $size) + $extra;
+                $varData->extendedValue = [$name => $size] + $extra;
             }
-        } catch (Exception $e) {
+        } catch (Exception) {
             return false;
         }
 
         return true;
     }
 
-    /**
-     * @param int $bytes
-     * @return string
-     */
-    private function humanFilesize($bytes)
+    private function humanFilesize(int $bytes): string
     {
-        $sizeInBytes = $bytes;
         if ($bytes < 10240) {
             return "{$bytes} bytes";
         }
 
-        $units           = array('B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB');
-        $precisionByUnit = array(0, 1, 1, 2, 2, 3, 3, 4, 4);
+        $sizeInBytes     = $bytes;
+        $units           = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+        $precisionByUnit = [0, 1, 1, 2, 2, 3, 3, 4, 4];
+
         for ($order = 0; ($bytes / 1024) >= 0.9 && $order < count($units); $order++) {
             $bytes /= 1024;
         }

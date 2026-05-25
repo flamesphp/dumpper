@@ -14,20 +14,15 @@ use SplFileInfo;
  */
 class DumpParsersFilePath extends DumpParsersSplFileInfo implements DumpParserInterface
 {
-    /** @return bool */
-    public function replacesAllOtherParsers()
+    public function replacesAllOtherParsers(): bool
     {
         return false;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function parse(&$variable, $varData)
+    public function parse(mixed &$variable, mixed $varData): mixed
     {
         if (
-            !DumpHelper::php53orLater()
-            || !is_string($variable)
+            !is_string($variable)
             || ($strlen = strlen($variable)) > 2048
             || $strlen < 3
             || !preg_match('#[\\\\/]#', $variable)

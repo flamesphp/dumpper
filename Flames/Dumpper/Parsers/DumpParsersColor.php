@@ -13,7 +13,7 @@ use Flames\Dumpper\Parsers\DumpParserInterface;
  */
 class DumpParsersColor implements DumpParserInterface
 {
-    private static $colorNames = array(
+    private static array $colorNames = [
         'aliceblue' => '#f0f8ff', 'antiquewhite' => '#faebd7', 'aqua' => '#00ffff',
         'aquamarine' => '#7fffd4', 'azure' => '#f0ffff', 'beige' => '#f5f5dc',
         'bisque' => '#ffe4c4', 'black' => '#000000', 'blanchedalmond' => '#ffebcd',
@@ -63,18 +63,14 @@ class DumpParsersColor implements DumpParserInterface
         'thistle' => '#d8bfd8', 'tomato' => '#ff6347', 'turquoise' => '#40e0d0',
         'violet' => '#ee82ee', 'wheat' => '#f5deb3', 'white' => '#ffffff',
         'whitesmoke' => '#f5f5f5', 'yellow' => '#ffff00', 'yellowgreen' => '#9acd32',
-    );
+    ];
 
-    /** @return bool */
-    public function replacesAllOtherParsers()
+    public function replacesAllOtherParsers(): bool
     {
         return false;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function parse(&$variable, $varData)
+    public function parse(mixed &$variable, mixed $varData): mixed
     {
         if (!$this->_fits($variable)) {
             return false;
@@ -91,13 +87,10 @@ HTML;
         }
 
         $varData->addTabToView($variable, 'CSS color', $value);
+        return null;
     }
 
-    /**
-     * @param mixed $variable
-     * @return bool
-     */
-    private function _fits($variable)
+    private function _fits(mixed $variable): bool
     {
         if (!DumpHelper::isRichMode() || !is_string($variable) || strlen($variable) > 32) {
             return false;
@@ -112,17 +105,11 @@ HTML;
             );
     }
 
-    /**
-     * Converts a CSS color to all its equivalent representations (hex, rgb, hsl, name).
-     *
-     * @param string $color
-     * @return array<string, string>
-     */
-    private function _convert($color)
+    private function _convert(string $color): array
     {
         $color         = strtolower($color);
-        $decimalColors = array();
-        $variants      = array('hex' => null, 'rgb' => null, 'name' => null, 'hsl' => null);
+        $decimalColors = [];
+        $variants      = ['hex' => null, 'rgb' => null, 'name' => null, 'hsl' => null];
 
         if (isset(self::$colorNames[$color])) {
             $variants['name'] = $color;
@@ -132,22 +119,20 @@ HTML;
         if ($color[0] === '#') {
             $variants['hex'] = $color;
             $color = substr($color, 1);
-            if (strlen($color) === 6) {
-                $colors = str_split($color, 2);
-            } else {
-                $colors = array($color[0] . $color[0], $color[1] . $color[1], $color[2] . $color[2]);
-            }
+            $colors = strlen($color) === 6
+                ? str_split($color, 2)
+                : [$color[0] . $color[0], $color[1] . $color[1], $color[2] . $color[2]];
             $decimalColors = array_map('hexdec', $colors);
-        } elseif (substr($color, 0, 3) === 'rgb') {
+        } elseif (str_starts_with($color, 'rgb')) {
             $variants['rgb'] = $color;
             preg_match_all('#([0-9.%]+)#', $color, $matches);
             $decimalColors = $matches[1];
             foreach ($decimalColors as &$c) {
-                if (strpos($c, '%') !== false) {
+                if (str_contains($c, '%')) {
                     $c = str_replace('%', '', $c) * 2.55;
                 }
             }
-        } elseif (substr($color, 0, 3) === 'hsl') {
+        } elseif (str_starts_with($color, 'hsl')) {
             $variants['hsl'] = $color;
             preg_match_all('#([0-9.%]+)#', $color, $matches);
             $colors      = $matches[1];
@@ -175,7 +160,7 @@ HTML;
                 case 'hex':
                     $variant = '#';
                     foreach ($decimalColors as &$c) {
-                        $variant .= str_pad(dechex($c), 2, '0', STR_PAD_LEFT);
+                        $variant .= str_pad(dechex((int)$c), 2, '0', STR_PAD_LEFT);
                     }
                     $variant .= isset($alpha) ? ' (alpha omitted)' : '';
                     break;
@@ -203,21 +188,20 @@ HTML;
         return $variants;
     }
 
-    /** @param array $hsl */
-    private function _HSLtoRGB(array $hsl)
+    private function _HSLtoRGB(array $hsl): array
     {
-        list($h, $s, $l) = $hsl;
+        [$h, $s, $l] = $hsl;
         $m2 = ($l <= 0.5) ? $l * ($s + 1) : $l + $s - $l * $s;
         $m1 = $l * 2 - $m2;
 
-        return array(
+        return [
             round($this->_hue2rgb($m1, $m2, $h + 0.33333) * 255),
             round($this->_hue2rgb($m1, $m2, $h) * 255),
             round($this->_hue2rgb($m1, $m2, $h - 0.33333) * 255),
-        );
+        ];
     }
 
-    private function _hue2rgb($m1, $m2, $h)
+    private function _hue2rgb(float $m1, float $m2, float $h): float
     {
         $h = ($h < 0) ? $h + 1 : (($h > 1) ? $h - 1 : $h);
         if ($h * 6 < 1) { return $m1 + ($m2 - $m1) * $h * 6; }
@@ -226,10 +210,9 @@ HTML;
         return $m1;
     }
 
-    /** @param array $rgb */
-    private function _RGBtoHSL(array $rgb)
+    private function _RGBtoHSL(array $rgb): ?array
     {
-        list($clrR, $clrG, $clrB) = $rgb;
+        [$clrR, $clrG, $clrB] = $rgb;
         $clrMin   = min($clrR, $clrG, $clrB);
         $clrMax   = max($clrR, $clrG, $clrB);
         $deltaMax = $clrMax - $clrMin;
@@ -243,14 +226,14 @@ HTML;
                 ? $deltaMax / ($clrMax + $clrMin)
                 : $deltaMax / (510 - $clrMax - $clrMin);
 
-            if ($clrMax == $clrR)      { $H = ($clrG - $clrB) / (6.0 * $deltaMax); }
-            elseif ($clrMax == $clrG)  { $H = 1 / 3 + ($clrB - $clrR) / (6.0 * $deltaMax); }
-            else                        { $H = 2 / 3 + ($clrR - $clrG) / (6.0 * $deltaMax); }
+            if ($clrMax == $clrR)     { $H = ($clrG - $clrB) / (6.0 * $deltaMax); }
+            elseif ($clrMax == $clrG) { $H = 1 / 3 + ($clrB - $clrR) / (6.0 * $deltaMax); }
+            else                      { $H = 2 / 3 + ($clrR - $clrG) / (6.0 * $deltaMax); }
 
             if ($H < 0) { $H += 1; }
             if ($H > 1) { $H -= 1; }
         }
 
-        return array(round($H * 360), round($S * 100) . '%', round($L * 100) . '%');
+        return [round($H * 360), round($S * 100) . '%', round($L * 100) . '%'];
     }
 }

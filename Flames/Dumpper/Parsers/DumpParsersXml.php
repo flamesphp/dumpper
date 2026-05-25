@@ -2,9 +2,6 @@
 
 namespace Flames\Dumpper\Parsers;
 
-use Exception;
-use Flames\Dumpper\Inc\DumpHelper;
-use Flames\Dumpper\Inc\DumpParser;
 use Flames\Dumpper\Parsers\DumpParserInterface;
 
 /**
@@ -14,16 +11,12 @@ use Flames\Dumpper\Parsers\DumpParserInterface;
  */
 class DumpParsersXml implements DumpParserInterface
 {
-    /** @return bool */
-    public function replacesAllOtherParsers()
+    public function replacesAllOtherParsers(): bool
     {
         return false;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function parse(&$variable, $varData)
+    public function parse(mixed &$variable, mixed $varData): mixed
     {
         return false;
     }

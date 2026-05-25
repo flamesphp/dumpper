@@ -16,24 +16,21 @@ use Flames\Dumpper\Dump;
  */
 class DumpDecoratorsRich implements DumpDecoratorsInterface
 {
-    protected static $needsAssets = true;
+    protected static bool $needsAssets = true;
 
-    /** @return bool */
-    public function areAssetsNeeded()
+    private static ?string $cachedInit = null;
+
+    public function areAssetsNeeded(): bool
     {
         return self::$needsAssets;
     }
 
-    /** @param bool $added */
-    public function setAssetsNeeded($added)
+    public function setAssetsNeeded(bool $added): void
     {
         self::$needsAssets = $added;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function decorate(DumpVariableData $varData)
+    public function decorate(DumpVariableData $varData): string
     {
         $output = '<dl>';
 
@@ -67,9 +64,9 @@ class DumpDecoratorsRich implements DumpDecoratorsInterface
 
             $isFirst = true;
             foreach ($allRepresentations as $tabName => $_) {
-                $active   = $isFirst ? ' class="_dumpper-active-tab"' : '';
-                $isFirst  = false;
-                $output  .= "<li{$active}>" . DumpHelper::esc($tabName) . '</li>';
+                $active  = $isFirst ? ' class="_dumpper-active-tab"' : '';
+                $isFirst = false;
+                $output .= "<li{$active}>" . DumpHelper::esc($tabName) . '</li>';
             }
 
             $output .= '</ul><ul>';
@@ -92,11 +89,9 @@ class DumpDecoratorsRich implements DumpDecoratorsInterface
     }
 
     /**
-     * {@inheritdoc}
-     *
      * @param DumpTraceStep[] $traceData
      */
-    public function decorateTrace(array $traceData, $pathsOnly = false)
+    public function decorateTrace(array $traceData, bool $pathsOnly = false): string
     {
         $output = '<dl class="_dumpper-trace">';
 
@@ -130,23 +125,16 @@ class DumpDecoratorsRich implements DumpDecoratorsInterface
         return $output;
     }
 
-    /**
-     * @param int           $i
-     * @param DumpTraceStep $step
-     * @param bool          $pathsOnly
-     * @return string
-     */
-    private function drawTraceStep($i, $step, $pathsOnly)
+    private function drawTraceStep(int $i, DumpTraceStep $step, bool $pathsOnly): string
     {
         $isChildless = !$step->sourceSnippet && !$step->arguments && !$step->object;
 
-        $class = '';
         if ($step->isBlackListed) {
-            $class .= ' _dumpper-blacklisted';
+            $class = ' _dumpper-blacklisted';
         } elseif ($isChildless) {
-            $class .= ' _dumpper-childless';
+            $class = ' _dumpper-childless';
         } else {
-            $class .= '_dumpper-parent';
+            $class = '_dumpper-parent';
             if (Dump::$expandedByDefault) {
                 $class .= ' _dumpper-show';
             }
@@ -165,7 +153,7 @@ class DumpDecoratorsRich implements DumpDecoratorsInterface
             return $output;
         }
 
-        $output .= '<dd><ul class="_dumpper-tabs">';
+        $output       .= '<dd><ul class="_dumpper-tabs">';
         $firstTabClass = ' class="_dumpper-active-tab"';
 
         if ($step->sourceSnippet) {
@@ -201,18 +189,12 @@ class DumpDecoratorsRich implements DumpDecoratorsInterface
         return $output;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function wrapStart()
+    public function wrapStart(): string
     {
         return '<div class="_dumpper">';
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function wrapEnd($callee, $miniTrace, $prevCaller)
+    public function wrapEnd(array $callee, array $miniTrace, array $prevCaller): string
     {
         if (!Dump::$displayCalledFrom) {
             return '</div>';
@@ -230,14 +212,16 @@ class DumpDecoratorsRich implements DumpDecoratorsInterface
         }
         if (
             isset($prevCaller['function'])
-            && !in_array($prevCaller['function'], array('include', 'include_once', 'require', 'require_once'))
+            && !in_array($prevCaller['function'], ['include', 'include_once', 'require', 'require_once'], true)
         ) {
             $callingFunction .= $prevCaller['function'] . '()';
         }
-        $callingFunction and $callingFunction = " [{$callingFunction}]";
+        if ($callingFunction) {
+            $callingFunction = " [{$callingFunction}]";
+        }
 
         if (isset($callee['file'])) {
-            $calleeInfo .= 'Called from ' . DumpHelper::ideLink($callee['file'], $callee['line']);
+            $calleeInfo .= 'Called from ' . DumpHelper::ideLink($callee['file'], $callee['line'] ?? null);
         }
 
         if (!empty($miniTrace)) {
@@ -246,15 +230,11 @@ class DumpDecoratorsRich implements DumpDecoratorsInterface
                 $traceDisplay .= '<li>' . DumpHelper::ideLink($step['file'], $step['line']);
                 if (
                     isset($step['function'])
-                    && !in_array($step['function'], array('include', 'include_once', 'require', 'require_once'))
+                    && !in_array($step['function'], ['include', 'include_once', 'require', 'require_once'], true)
                 ) {
-                    $classString = ' [';
-                    if (isset($step['class'])) {
-                        $classString .= $step['class'];
-                    }
-                    if (isset($step['type'])) {
-                        $classString .= $step['type'];
-                    }
+                    $classString   = ' [';
+                    $classString  .= $step['class'] ?? '';
+                    $classString  .= $step['type'] ?? '';
                     $classString  .= $step['function'] . '()]';
                     $traceDisplay .= $classString;
                 }
@@ -271,11 +251,7 @@ class DumpDecoratorsRich implements DumpDecoratorsInterface
             . '</footer></div>';
     }
 
-    /**
-     * @param DumpVariableData $varData
-     * @return string
-     */
-    private function _drawHeader(DumpVariableData $varData)
+    private function _drawHeader(DumpVariableData $varData): string
     {
         $output = '';
         if ($varData->access !== null) {
@@ -298,34 +274,37 @@ class DumpDecoratorsRich implements DumpDecoratorsInterface
     }
 
     /**
-     * Produces the CSS and JS assets needed for rich display.
-     * Only emits content once per page-load (or until `-` / `@` modifier resets the flag).
-     *
-     * @return string
+     * Produces the CSS and JS assets needed for rich display (cached after first load).
      */
-    public function init()
+    public function init(): string
     {
+        if (self::$cachedInit !== null) {
+            return self::$cachedInit;
+        }
+
         $baseDir = Dump::dir() . '../../resources/';
 
-        $cssFile    = $baseDir . 'solarized-dark.css';
-        $defaultCss = file_get_contents($cssFile);
-        $defaultCss = str_replace('body{background:#073642;color:#fff}', '', $defaultCss);
+        $defaultCss = str_replace(
+            'body{background:#073642;color:#fff}',
+            '',
+            (string)file_get_contents($baseDir . 'solarized-dark.css')
+        );
 
         $mountHtml =
             '<script class="_dumpper-js">' . file_get_contents($baseDir . 'dumpper.js') . '</script>'
             . '<style class="_dumpper-css">' . $defaultCss . '</style>';
 
-        $mountHtml .= '<style class="_dumpper-css">' . file_get_contents($baseDir . 'dark.css') . '</style>';
+        $darkCss = $baseDir . 'dark.css';
+        if (file_exists($darkCss)) {
+            $mountHtml .= '<style class="_dumpper-css">' . file_get_contents($darkCss) . '</style>';
+        }
+
         $mountHtml .= "\n";
 
-        return $mountHtml;
+        return self::$cachedInit = $mountHtml;
     }
 
-    /**
-     * @param mixed $alternative
-     * @return string
-     */
-    private function decorateAlternativeView($alternative)
+    private function decorateAlternativeView(mixed $alternative): string
     {
         if (empty($alternative)) {
             return '';

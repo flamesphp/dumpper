@@ -14,42 +14,28 @@ interface DumpDecoratorsInterface
 {
     /**
      * Renders a single DumpVariableData node.
-     *
-     * @param DumpVariableData $varData
-     * @return string
      */
-    public function decorate(DumpVariableData $varData);
+    public function decorate(DumpVariableData $varData): string;
 
     /**
      * Renders a full backtrace.
      *
      * @param DumpTraceStep[] $traceData
-     * @param bool            $pathsOnly skip arguments and callee objects
-     * @return string
      */
-    public function decorateTrace(array $traceData, $pathsOnly = false);
+    public function decorateTrace(array $traceData, bool $pathsOnly = false): string;
 
     /**
      * Opens the outer wrapper element for a single dump() call.
-     *
-     * @return string
      */
-    public function wrapStart();
+    public function wrapStart(): string;
 
     /**
      * Closes the outer wrapper and appends callee information.
-     *
-     * @param array $callee
-     * @param array $miniTrace
-     * @param array $prevCaller
-     * @return string
      */
-    public function wrapEnd($callee, $miniTrace, $prevCaller);
+    public function wrapEnd(array $callee, array $miniTrace, array $prevCaller): string;
 
     /**
      * Returns the CSS/JS assets required for the first render (may be empty string).
-     *
-     * @return string
      */
-    public function init();
+    public function init(): string;
 }

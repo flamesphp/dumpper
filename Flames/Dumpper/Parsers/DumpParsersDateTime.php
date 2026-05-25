@@ -12,16 +12,12 @@ use Flames\Dumpper\Parsers\DumpParserInterface;
  */
 class DumpParsersDateTime implements DumpParserInterface
 {
-    /** @return bool */
-    public function replacesAllOtherParsers()
+    public function replacesAllOtherParsers(): bool
     {
         return true;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function parse(&$variable, $varData)
+    public function parse(mixed &$variable, mixed $varData): mixed
     {
         if (!$variable instanceof DateTimeInterface) {
             return false;
@@ -43,5 +39,7 @@ class DumpParsersDateTime implements DumpParserInterface
 
         $varData->value = $variable->format($format);
         $varData->type  = get_class($variable);
+
+        return null;
     }
 }

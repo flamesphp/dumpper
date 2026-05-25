@@ -13,20 +13,15 @@ use Flames\Model;
  */
 class DumpParsersFlamesModel implements DumpParserInterface
 {
-    /** @return bool */
-    public function replacesAllOtherParsers()
+    public function replacesAllOtherParsers(): bool
     {
         return false;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function parse(&$variable, $varData)
+    public function parse(mixed &$variable, mixed $varData): mixed
     {
         if (
             !DumpHelper::isRichMode()
-            || !DumpHelper::php53orLater()
             || !is_object($variable)
             || !$variable instanceof Model
         ) {
@@ -36,12 +31,14 @@ class DumpParsersFlamesModel implements DumpParserInterface
         $arrayCopy = $variable->toArray();
         $size      = count($arrayCopy);
 
-        $modelDetails = array(
+        $modelDetails = [
             'database' => $variable::getDatabase(),
             'table'    => $variable::getTable(),
-        );
+        ];
 
         $varData->addTabToView($variable, "Model contents ({$size})", $arrayCopy);
         $varData->addTabToView($variable, 'Model details', $modelDetails);
+
+        return null;
     }
 }

@@ -13,31 +13,24 @@ use Flames\Dumpper\Parsers\DumpParserInterface;
  */
 class DumpParsersTimestamp implements DumpParserInterface
 {
-    /** @return bool */
-    public function replacesAllOtherParsers()
+    public function replacesAllOtherParsers(): bool
     {
         return false;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function parse(&$variable, $varData)
+    public function parse(mixed &$variable, mixed $varData): mixed
     {
         if (!$this->_fits($variable)) {
             return false;
         }
 
-        $var = strlen($variable) === 13 ? substr($variable, 0, -3) : $variable;
+        $var = strlen((string)$variable) === 13 ? substr((string)$variable, 0, -3) : $variable;
 
-        $varData->addTabToView($variable, 'Timestamp', @date('Y-m-d H:i:s', $var));
+        $varData->addTabToView($variable, 'Timestamp', @date('Y-m-d H:i:s', (int)$var));
+        return null;
     }
 
-    /**
-     * @param mixed $variable
-     * @return bool
-     */
-    private function _fits($variable)
+    private function _fits(mixed $variable): bool
     {
         if (!DumpHelper::isRichMode()) {
             return false;
@@ -46,11 +39,11 @@ class DumpParsersTimestamp implements DumpParserInterface
             return false;
         }
 
-        $len = strlen((int)$variable);
+        $len = strlen((string)(int)$variable);
 
         return (
             $len === 9 || $len === 10
-            || ($len === 13 && substr($variable, -3) === '000')
+            || ($len === 13 && str_ends_with((string)$variable, '000'))
         )
         && ((string)(int)$variable == $variable);
     }

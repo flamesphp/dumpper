@@ -12,19 +12,15 @@ use Flames\Dumpper\Parsers\DumpParserInterface;
  */
 class DumpParsersMicrotime implements DumpParserInterface
 {
-    private static $times = array();
-    private static $laps  = array();
+    private static array $times = [];
+    private static array $laps  = [];
 
-    /** @return bool */
-    public function replacesAllOtherParsers()
+    public function replacesAllOtherParsers(): bool
     {
         return false;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function parse(&$variable, $varData)
+    public function parse(mixed &$variable, mixed $varData): mixed
     {
         if (
             !is_string($variable)
@@ -33,30 +29,30 @@ class DumpParsersMicrotime implements DumpParserInterface
             return false;
         }
 
-        list($usec, $sec) = explode(' ', $variable);
+        [$usec, $sec] = explode(' ', $variable);
 
         $time = (float)$usec + (float)$sec;
 
-        $size = memory_get_usage(true);
-        $unit = array('B', 'KB', 'MB', 'GB', 'TB');
-        $memoryUsage = round($size / pow(1024, ($i = floor(log($size, 1024)))), 3) . $unit[$i];
+        $size        = memory_get_usage(true);
+        $unit        = ['B', 'KB', 'MB', 'GB', 'TB'];
+        $i           = (int)floor(log($size, 1024));
+        $memoryUsage = round($size / (1024 ** $i), 3) . $unit[$i];
 
         $numberOfCalls = count(self::$times);
         if ($numberOfCalls > 0) {
-            $lap       = $time - end(self::$times);
+            $lap          = $time - end(self::$times);
             self::$laps[] = $lap;
-            $sinceLast = round($lap, 4) . 's.';
+            $sinceLast    = round($lap, 4) . 's.';
 
+            $sinceStart      = null;
+            $averageDuration = null;
             if ($numberOfCalls > 1) {
                 $sinceStart      = round($time - self::$times[0], 4) . 's.';
                 $averageDuration = round(array_sum(self::$laps) / $numberOfCalls, 4) . 's.';
-            } else {
-                $sinceStart      = null;
-                $averageDuration = null;
             }
 
             if (DumpHelper::isRichMode()) {
-                $tabContents  = "<b>SINCE LAST SUCH CALL:</b> <b class=\"_dumpper-microtime\">" . round($lap, 4) . '</b>s.';
+                $tabContents = "<b>SINCE LAST SUCH CALL:</b> <b class=\"_dumpper-microtime\">" . round($lap, 4) . '</b>s.';
                 if ($numberOfCalls > 1) {
                     $tabContents .= "\n<b>SINCE START:</b> {$sinceStart}";
                     $tabContents .= "\n<b>AVERAGE DURATION:</b> {$averageDuration}";
@@ -64,20 +60,21 @@ class DumpParsersMicrotime implements DumpParserInterface
                 $tabContents .= "\n<b>PHP MEMORY USAGE:</b> {$memoryUsage}";
                 $varData->addTabToView($variable, 'Benchmark', $tabContents);
             } else {
-                $varData->extendedValue = array('Since last such call' => $sinceLast);
+                $varData->extendedValue = ['Since last such call' => $sinceLast];
                 if ($sinceStart !== null) {
-                    $varData->extendedValue['Since start']       = $sinceStart;
-                    $varData->extendedValue['Average duration']  = $averageDuration;
+                    $varData->extendedValue['Since start']      = $sinceStart;
+                    $varData->extendedValue['Average duration'] = $averageDuration;
                 }
                 $varData->extendedValue['Memory usage'] = $memoryUsage;
             }
         } else {
-            $varData->extendedValue = array(
+            $varData->extendedValue = [
                 'Time (from microtime)' => @date('Y-m-d H:i:s', (int)$sec) . substr($usec, 1),
                 'PHP MEMORY USAGE'      => $memoryUsage,
-            );
+            ];
         }
 
         self::$times[] = $time;
+        return null;
     }
 }

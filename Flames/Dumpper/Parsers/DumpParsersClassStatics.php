@@ -15,37 +15,30 @@ use ReflectionProperty;
  */
 class DumpParsersClassStatics implements DumpParserInterface
 {
-    /** @return bool */
-    public function replacesAllOtherParsers()
+    public function replacesAllOtherParsers(): bool
     {
         return false;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function parse(&$variable, $varData)
+    public function parse(mixed &$variable, mixed $varData): mixed
     {
-        if (!DumpHelper::isRichMode() || !DumpHelper::php53orLater() || !is_object($variable)) {
+        if (!DumpHelper::isRichMode() || !is_object($variable)) {
             return false;
         }
 
-        $statics    = array();
-        $class      = get_class($variable);
-        $reflection = new ReflectionClass($class);
+        $statics    = [];
+        $reflection = new ReflectionClass(get_class($variable));
 
         foreach ($reflection->getProperties(ReflectionProperty::IS_STATIC) as $property) {
             if ($property->isProtected()) {
-                $property->setAccessible(true);
                 $access = 'protected';
             } elseif ($property->isPrivate()) {
-                $property->setAccessible(true);
                 $access = 'private';
             } else {
                 $access = 'public';
             }
 
-            if (method_exists($property, 'isInitialized') && !$property->isInitialized($variable)) {
+            if (!$property->isInitialized($variable)) {
                 $value   = null;
                 $access .= ' [uninitialized]';
             } else {
@@ -69,5 +62,7 @@ class DumpParsersClassStatics implements DumpParserInterface
             'Static class properties (' . count($statics) . ')',
             $statics
         );
+
+        return null;
     }
 }

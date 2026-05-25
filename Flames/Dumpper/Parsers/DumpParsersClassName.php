@@ -16,20 +16,15 @@ use Throwable;
  */
 class DumpParsersClassName implements DumpParserInterface
 {
-    /** @return bool */
-    public function replacesAllOtherParsers()
+    public function replacesAllOtherParsers(): bool
     {
         return false;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function parse(&$variable, $varData)
+    public function parse(mixed &$variable, mixed $varData): mixed
     {
         if (
             Dump::enabled() === Dump::MODE_TEXT_ONLY
-            || !DumpHelper::php53orLater()
             || empty($variable)
             || !is_string($variable)
             || strlen($variable) < 3
@@ -41,9 +36,7 @@ class DumpParsersClassName implements DumpParserInterface
             if (!@class_exists($variable)) {
                 return false;
             }
-        } catch (Throwable $t) {
-            return false;
-        } catch (Exception $e) {
+        } catch (Throwable) {
             return false;
         }
 
@@ -63,19 +56,11 @@ class DumpParsersClassName implements DumpParserInterface
                 )
             );
         } else {
-            if (DumpHelper::isHtmlMode()) {
-                $varData->extendedValue = array(
-                    'Existing class' => DumpHelper::ideLink(
-                        $reflector->getFileName(),
-                        $reflector->getStartLine(),
-                        $reflector->getShortName()
-                    ),
-                );
-            } else {
-                $varData->extendedValue = array(
-                    'Existing class' => $reflector->getFileName() . ':' . $reflector->getStartLine(),
-                );
-            }
+            $varData->extendedValue = DumpHelper::isHtmlMode()
+                ? ['Existing class' => DumpHelper::ideLink($reflector->getFileName(), $reflector->getStartLine(), $reflector->getShortName())]
+                : ['Existing class' => $reflector->getFileName() . ':' . $reflector->getStartLine()];
         }
+
+        return null;
     }
 }

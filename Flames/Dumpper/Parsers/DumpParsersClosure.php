@@ -16,16 +16,12 @@ use ReflectionFunction;
  */
 class DumpParsersClosure implements DumpParserInterface
 {
-    /** @return bool */
-    public function replacesAllOtherParsers()
+    public function replacesAllOtherParsers(): bool
     {
         return true;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function parse(&$variable, $varData)
+    public function parse(mixed &$variable, mixed $varData): mixed
     {
         if (!$variable instanceof Closure) {
             return false;
@@ -34,19 +30,19 @@ class DumpParsersClosure implements DumpParserInterface
         $varData->type = 'Closure';
         $reflection    = new ReflectionFunction($variable);
 
-        $parameters = array();
+        $parameters = [];
         foreach ($reflection->getParameters() as $parameter) {
-            $parameters = $parameter->name;
+            $parameters[] = $parameter->name;
         }
         if (!empty($parameters)) {
             $varData->addTabToView($variable, 'Closure Parameters', $parameters);
         }
 
-        $uses = array();
+        $uses = [];
         if ($val = $reflection->getStaticVariables()) {
             $uses = $val;
         }
-        if (method_exists($reflection, 'getClosureThis') && $val = $reflection->getClosureThis()) {
+        if ($val = $reflection->getClosureThis()) {
             $uses[] = DumpParser::process($val, 'Closure $this');
         }
         if (!empty($uses)) {
@@ -56,5 +52,7 @@ class DumpParsersClosure implements DumpParserInterface
         if ($reflection->getFileName()) {
             $varData->value = DumpHelper::ideLink($reflection->getFileName(), $reflection->getStartLine());
         }
+
+        return null;
     }
 }

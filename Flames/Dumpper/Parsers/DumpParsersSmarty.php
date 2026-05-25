@@ -12,16 +12,12 @@ use Smarty;
  */
 class DumpParsersSmarty implements DumpParserInterface
 {
-    /** @return bool */
-    public function replacesAllOtherParsers()
+    public function replacesAllOtherParsers(): bool
     {
         return true;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function parse(&$variable, $varData)
+    public function parse(mixed &$variable, mixed $varData): mixed
     {
         if (!$variable instanceof Smarty || !defined('Smarty::SMARTY_VERSION')) {
             return false;
@@ -29,8 +25,8 @@ class DumpParsersSmarty implements DumpParserInterface
 
         $varData->name = 'Smarty v' . Smarty::SMARTY_VERSION;
 
-        $assigned      = array();
-        $globalAssigns = array();
+        $assigned      = [];
+        $globalAssigns = [];
 
         foreach ($variable->tpl_vars as $name => $var) {
             $assigned[$name] = $var->value;
@@ -44,10 +40,12 @@ class DumpParsersSmarty implements DumpParserInterface
 
         $varData->addTabToView($variable, 'Assigned to view', $assigned);
         $varData->addTabToView($variable, 'Assigned globally', $globalAssigns);
-        $varData->addTabToView($variable, 'Configuration', array(
+        $varData->addTabToView($variable, 'Configuration', [
             'Compiled files stored in' => isset($variable->compile_dir)
                 ? $variable->compile_dir
                 : $variable->getCompileDir(),
-        ));
+        ]);
+
+        return null;
     }
 }

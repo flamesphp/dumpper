@@ -18,46 +18,62 @@ use ReflectionProperty;
  */
 class DumpParser
 {
-    public static $_level = 0;
-    /** @var array<string, true>|null */
-    private static $_objects;
-    /** @var string|null */
-    private static $_marker;
+    public static int $_level = 0;
 
-    private static $parsingAlternative = array();
-    private static $_placeFullStringInValue = false;
+    /** @var array<int, true>|null */
+    private static ?array $_objects = null;
+
+    private static ?string $_marker = null;
+
+    /** @var array<string, true> */
+    private static array $parsingAlternative = [];
+
+    private static bool $_placeFullStringInValue = false;
 
     /**
      * Cached parser instances, keyed by class short-name.
-     * Parsers are stateless between parse() calls so reuse is safe.
      *
      * @var array<string, object>
      */
-    private static $parserInstances = array();
+    private static array $parserInstances = [];
+
+    /**
+     * Map of PHP gettype() return values to their _parse_* method names.
+     *
+     * @var array<string, string>
+     */
+    private static array $parseMethods = [
+        'array'   => '_parse_array',
+        'object'  => '_parse_object',
+        'boolean' => '_parse_boolean',
+        'double'  => '_parse_double',
+        'integer' => '_parse_integer',
+        'NULL'    => '_parse_null',
+        'resource' => '_parse_resource',
+        'string'  => '_parse_string',
+        'unknown' => '_parse_unknown',
+    ];
 
     /**
      * Cached ReflectionClass instances, keyed by class name.
      *
      * @var array<string, ReflectionClass>
      */
-    private static $reflectionClasses = array();
+    private static array $reflectionClasses = [];
 
     /**
      * Cached public property names per class: ['ClassName' => ['prop' => true]].
      *
      * @var array<string, array<string, true>>
      */
-    private static $classPublicProps = array();
+    private static array $classPublicProps = [];
 
-    /** @var bool|null cached result of function_exists('spl_object_hash') */
-    private static $hasSplObjectHash = null;
+    private static bool $_dealingWithGlobals = false;
 
     /**
      * Resets parser state between separate dump() calls.
-     *
-     * @return void
      */
-    public static function reset()
+    public static function reset(): void
     {
         self::$_level   = 0;
         self::$_objects = self::$_marker = null;
@@ -65,28 +81,24 @@ class DumpParser
 
     /**
      * Processes a variable and returns its DumpVariableData representation.
-     *
-     * @param mixed       $variable
-     * @param string|null $name
-     * @return DumpVariableData
      */
-    final public static function process(&$variable, $name = null)
+    final public static function process(mixed &$variable, string|int|null $name = null): DumpVariableData
     {
-        $revert = array(
+        $revert = [
             'level'   => self::$_level,
             'objects' => self::$_objects,
-        );
+        ];
 
         self::$_level++;
 
         $varData = new DumpVariableData();
         if (isset($name)) {
             $varData->name = $name;
-            if (strlen($varData->name) > 60) {
+            if (is_string($name) && strlen($name) > 60) {
                 $varData->name =
-                    DumpHelper::substr($varData->name, 0, 27)
+                    DumpHelper::substr($name, 0, 27)
                     . '...'
-                    . DumpHelper::substr($varData->name, -28, null);
+                    . DumpHelper::substr($name, -28, null);
             }
         }
 
@@ -111,13 +123,15 @@ class DumpParser
             unset(self::$parsingAlternative[$parserClass]);
         }
 
-        $varType    = gettype($variable);
-        $varType === 'unknown type' and $varType = 'unknown';
-        $methodName = '_parse_' . $varType;
-        if (!method_exists(__CLASS__, $methodName)) {
+        $varType = gettype($variable);
+        $varType = $varType === 'unknown type' ? 'unknown' : $varType;
+
+        if (!isset(self::$parseMethods[$varType])) {
             $varData->type = $varType;
             return $varData;
         }
+
+        $methodName = self::$parseMethods[$varType];
 
         if (self::$methodName($variable, $varData) === false) {
             self::$_level--;
@@ -130,30 +144,27 @@ class DumpParser
         return $varData;
     }
 
-    /**
-     * @return bool
-     */
-    private static function isDepthLimit()
+    private static function isDepthLimit(): bool
     {
-        return Dump::$maxLevels && self::$_level >= Dump::$maxLevels;
+        return (bool)(Dump::$maxLevels && self::$_level >= Dump::$maxLevels);
     }
 
     /**
      * Detects whether the array is tabular (array of uniform-key arrays).
      *
-     * @param array $variable
      * @return array|false all column keys if tabular, false otherwise
      */
-    private static function _isArrayTabular(array $variable)
+    private static function _isArrayTabular(array $variable): array|false
     {
         if (Dump::enabled() !== Dump::MODE_RICH) {
             return false;
         }
 
-        $arrayKeys   = array();
-        $arrayKeySet = array();
+        $arrayKeys   = [];
+        $arrayKeySet = [];
         $keys        = null;
         $closeEnough = false;
+
         foreach ($variable as $k => $row) {
             if (isset(self::$_marker) && $k === self::$_marker) {
                 continue;
@@ -189,11 +200,7 @@ class DumpParser
         return $arrayKeys;
     }
 
-    /**
-     * @param DumpVariableData $varData
-     * @return string HTML table cell
-     */
-    private static function _decorateCell(DumpVariableData $varData)
+    private static function _decorateCell(DumpVariableData $varData): string
     {
         if ($varData->extendedValue !== null) {
             return '<td>' . DumpDecoratorsRich::decorate($varData) . '</td>';
@@ -223,16 +230,12 @@ class DumpParser
         return $output . '</td>';
     }
 
-    private static $_dealingWithGlobals = false;
-
     /**
-     * @param array            $variable
-     * @param DumpVariableData $variableData
      * @return false|void
      */
-    private static function _parse_array(&$variable, DumpVariableData $variableData)
+    private static function _parse_array(mixed &$variable, DumpVariableData $variableData)
     {
-        isset(self::$_marker) or self::$_marker = "\x00" . uniqid();
+        self::$_marker ??= "\x00" . uniqid();
 
         $globalsDetector = false;
         if (array_key_exists('GLOBALS', $variable) && is_array($variable['GLOBALS'])) {
@@ -271,10 +274,10 @@ class DumpParser
         $variable[self::$_marker] = true;
 
         if ($variableData->size > 1 && ($arrayKeys = self::_isArrayTabular($variable)) !== false) {
-            $firstRow     = true;
+            $firstRow      = true;
             $extendedValue = '<table class="_dumpper-report"><thead>';
 
-            foreach ($variable as $rowIndex => & $row) {
+            foreach ($variable as $rowIndex => &$row) {
                 self::$_placeFullStringInValue = true;
 
                 if ($rowIndex === self::$_marker) {
@@ -328,8 +331,8 @@ class DumpParser
             self::$_placeFullStringInValue = false;
             $variableData->extendedValue = $extendedValue . '</table>';
         } else {
-            $extendedValue = array();
-            foreach ($variable as $key => & $val) {
+            $extendedValue = [];
+            foreach ($variable as $key => &$val) {
                 if ($key === self::$_marker) {
                     continue;
                 }
@@ -360,15 +363,14 @@ class DumpParser
     }
 
     /**
-     * @param object           $variable
-     * @param DumpVariableData $variableData
      * @return false|void
      */
-    private static function _parse_object(&$variable, DumpVariableData $variableData)
+    private static function _parse_object(mixed &$variable, DumpVariableData $variableData)
     {
         $hash        = self::getObjectHash($variable);
         $castedArray = (array)$variable;
         $className   = get_class($variable);
+
         $variableData->type = $className;
         $variableData->size = count($castedArray);
 
@@ -385,7 +387,7 @@ class DumpParser
             $variable->setFlags(ArrayObject::STD_PROP_LIST);
         }
 
-        if (strpos($variableData->type, "@anonymous\0") !== false) {
+        if (str_contains($variableData->type, "@anonymous\0")) {
             $variableData->type = 'Anonymous class';
         }
 
@@ -394,14 +396,14 @@ class DumpParser
         if (!isset(self::$reflectionClasses[$className])) {
             $rc = new ReflectionClass($className);
             self::$reflectionClasses[$className] = $rc;
-            $props = array();
+            $props = [];
             foreach ($rc->getProperties(ReflectionProperty::IS_PUBLIC) as $prop) {
                 $props[$prop->name] = true;
             }
             self::$classPublicProps[$className] = $props;
         }
-        $reflector    = self::$reflectionClasses[$className];
-        $publicProps  = self::$classPublicProps[$className];
+        $reflector   = self::$reflectionClasses[$className];
+        $publicProps = self::$classPublicProps[$className];
 
         if (DumpHelper::isHtmlMode() && $reflector->isUserDefined()) {
             $variableData->type = DumpHelper::ideLink(
@@ -412,7 +414,7 @@ class DumpParser
         }
         $variableData->size = 0;
 
-        $extendedValue = array();
+        $extendedValue = [];
 
         foreach ($castedArray as $key => $value) {
             $output = self::process($value);
@@ -448,23 +450,21 @@ class DumpParser
 
             $name = $property->getName();
             if (isset($extendedValue[$name])) {
-                if (method_exists($property, 'isReadOnly') && $property->isReadOnly()) {
+                if ($property->isReadOnly()) {
                     $extendedValue[$name]->access .= ' readonly';
                 }
                 continue;
             }
 
             if ($property->isProtected()) {
-                $property->setAccessible(true);
                 $access = 'protected';
             } elseif ($property->isPrivate()) {
-                $property->setAccessible(true);
                 $access = 'private';
             } else {
                 $access = 'public';
             }
 
-            if (method_exists($property, 'isInitialized') && !$property->isInitialized($variable)) {
+            if (!$property->isInitialized($variable)) {
                 $value  = null;
                 $access .= ' [uninitialized]';
             } else {
@@ -482,7 +482,7 @@ class DumpParser
             $variable->setFlags($arrayObjectFlags);
         }
 
-        if (method_exists($reflector, 'isEnum') && $reflector->isEnum()) {
+        if ($reflector->isEnum()) {
             $variableData->size  = 'enum';
             $variableData->value = '"' . $variable->name . '"';
         }
@@ -492,38 +492,38 @@ class DumpParser
         }
     }
 
-    private static function _parse_boolean(&$variable, DumpVariableData $variableData)
+    private static function _parse_boolean(mixed &$variable, DumpVariableData $variableData): void
     {
         $variableData->type  = 'bool';
         $variableData->value = $variable ? 'TRUE' : 'FALSE';
     }
 
-    private static function _parse_double(&$variable, DumpVariableData $variableData)
+    private static function _parse_double(mixed &$variable, DumpVariableData $variableData): void
     {
         $variableData->type  = 'float';
         $variableData->value = $variable;
     }
 
-    private static function _parse_integer(&$variable, DumpVariableData $variableData)
+    private static function _parse_integer(mixed &$variable, DumpVariableData $variableData): void
     {
         $variableData->type  = 'integer';
         $variableData->value = $variable;
     }
 
-    private static function _parse_null(&$variable, DumpVariableData $variableData)
+    private static function _parse_null(mixed &$variable, DumpVariableData $variableData): void
     {
         $variableData->type = 'NULL';
     }
 
-    private static function _parse_resource(&$variable, DumpVariableData $variableData)
+    private static function _parse_resource(mixed &$variable, DumpVariableData $variableData): void
     {
-        $resourceType      = get_resource_type($variable);
+        $resourceType       = get_resource_type($variable);
         $variableData->type = "resource ({$resourceType})";
 
         if ($resourceType === 'stream' && $meta = stream_get_meta_data($variable)) {
             if (isset($meta['uri'])) {
                 $file = $meta['uri'];
-                if (function_exists('stream_is_local') && stream_is_local($file)) {
+                if (stream_is_local($file)) {
                     $file = DumpHelper::shortenPath($file);
                 }
                 $variableData->value = $file;
@@ -531,12 +531,12 @@ class DumpParser
         }
     }
 
-    private static function _parse_string(&$variable, DumpVariableData $variableData)
+    private static function _parse_string(mixed &$variable, DumpVariableData $variableData): void
     {
         if (preg_match('//u', $variable)) {
             $variableData->type = 'string';
         } else {
-            $variableData->type .= 'binary string';
+            $variableData->type = 'binary string';
         }
 
         $encoding = DumpHelper::detectEncoding($variable);
@@ -577,48 +577,31 @@ class DumpParser
         }
     }
 
-    private static function _parse_unknown(&$variable, DumpVariableData $variableData)
+    private static function _parse_unknown(mixed &$variable, DumpVariableData $variableData): void
     {
         $type = gettype($variable);
         $variableData->type  = 'UNKNOWN' . (!empty($type) ? " ({$type})" : '');
         $variableData->value = var_export($variable, true);
     }
 
-    /**
-     * @param object $variable
-     * @return string
-     */
-    private static function getObjectHash($variable)
+    private static function getObjectHash(object $variable): int
     {
-        if (self::$hasSplObjectHash === null) {
-            self::$hasSplObjectHash = function_exists('spl_object_hash');
-        }
-        if (self::$hasSplObjectHash) {
-            return spl_object_hash($variable);
-        }
-
-        ob_start();
-        var_dump($variable);
-        preg_match('[#(\d+)]', ob_get_clean(), $match);
-
-        return $match[1];
+        return spl_object_id($variable);
     }
 
     /**
      * Parses $alternativesArray as a context-aware alternative view for $originalVar.
      *
-     * @param mixed        $originalVar
-     * @param array|object $alternativesArray
      * @return DumpVariableData[]|string|null
      */
-    public static function alternativesParse($originalVar, $alternativesArray)
+    public static function alternativesParse(mixed $originalVar, array|object $alternativesArray): array|string|null
     {
         $varData = new DumpVariableData();
 
         if (is_object($originalVar)) {
             self::$_objects[self::getObjectHash($originalVar)] = true;
         } elseif (is_array($originalVar)) {
-            isset(self::$_marker) or self::$_marker = "\x00" . uniqid();
+            self::$_marker ??= "\x00" . uniqid();
             $originalVar[self::$_marker] = true;
         }
 

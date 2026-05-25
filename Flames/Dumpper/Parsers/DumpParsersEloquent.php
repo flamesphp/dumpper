@@ -14,25 +14,20 @@ use ReflectionObject;
  */
 class DumpParsersEloquent implements DumpParserInterface
 {
-    /** @return bool */
-    public function replacesAllOtherParsers()
+    public function replacesAllOtherParsers(): bool
     {
         return true;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function parse(&$variable, $varData)
+    public function parse(mixed &$variable, mixed $varData): mixed
     {
-        if (!DumpHelper::php53orLater() || !is_a($variable, '\Illuminate\Database\Eloquent\Model')) {
+        if (!is_a($variable, '\Illuminate\Database\Eloquent\Model')) {
             return false;
         }
 
-        $reflection   = new ReflectionObject($variable);
+        $reflection     = new ReflectionObject($variable);
         $attrReflection = $reflection->getProperty('attributes');
-        $attrReflection->setAccessible(true);
-        $attributes = $attrReflection->getValue($variable);
+        $attributes     = $attrReflection->getValue($variable);
 
         $reference = '`' . $variable->getConnection()->getDatabaseName() . '`.`' . $variable->getTable() . '`';
 
@@ -44,5 +39,7 @@ class DumpParsersEloquent implements DumpParserInterface
             $varData->type          = $reflection->getName() . '; ' . $reference . ' row data:';
             $varData->extendedValue = DumpParser::alternativesParse($variable, $attributes);
         }
+
+        return null;
     }
 }

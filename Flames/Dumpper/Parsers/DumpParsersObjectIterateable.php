@@ -7,30 +7,25 @@ use Flames\Dumpper\Parsers\DumpParserInterface;
 use Traversable;
 
 /**
- * Exposes the iterator contents of any Traversable object as an extra tab.
+ * Exposes the iterator contents of Traversable DOM objects as an extra tab.
  *
  * @internal
  */
 class DumpParsersObjectIterateable implements DumpParserInterface
 {
-    /** @return bool */
-    public function replacesAllOtherParsers()
+    public function replacesAllOtherParsers(): bool
     {
         return false;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function parse(&$variable, $varData)
+    public function parse(mixed &$variable, mixed $varData): mixed
     {
         if (
             !DumpHelper::isRichMode()
-            || !DumpHelper::php53orLater()
             || !is_object($variable)
             || !$variable instanceof Traversable
             || stripos($class = get_class($variable), 'zend') !== false
-            || strpos($class, 'DOMN') !== 0
+            || !str_starts_with($class, 'DOMN')
         ) {
             return false;
         }
@@ -39,5 +34,6 @@ class DumpParsersObjectIterateable implements DumpParserInterface
         $size      = count($arrayCopy);
 
         $varData->addTabToView($variable, "Iterator contents ({$size})", $arrayCopy);
+        return null;
     }
 }

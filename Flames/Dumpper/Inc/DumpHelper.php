@@ -2,7 +2,6 @@
 
 namespace Flames\Dumpper\Inc;
 
-use Flames;
 use Flames\Dumpper\Dump;
 
 /**
@@ -12,12 +11,10 @@ use Flames\Dumpper\Dump;
  */
 class DumpHelper
 {
-    private static $_php53;
-
     const MAX_STR_LENGTH = 80;
 
     /** @var array<string, string> editor protocol templates */
-    public static $editors = array(
+    public static array $editors = [
         'sublime'                => 'subl://open?url=file://%file&line=%line',
         'textmate'               => 'txmt://open?url=file://%file&line=%line',
         'emacs'                  => 'emacs://open?url=file://%file&line=%line',
@@ -34,89 +31,49 @@ class DumpHelper
         'nova'                   => 'nova://core/open/file?filename=%file&line=%line',
         'netbeans'               => 'netbeans://open/?f=%file:%line',
         'xdebug'                 => 'xdebug://%file@%line',
-    );
+    ];
 
-    private static $projectRootDir;
+    private static ?string $projectRootDir = null;
 
     /**
      * Hash-map of internal method aliases: ['classname_lower' => ['methodname_lower' => true]].
-     * Populated by buildAliases().
      *
      * @var array<string, array<string, true>>|null
      */
-    private static $internalMethods = null;
+    private static ?array $internalMethods = null;
 
     /**
      * Hash-map of internal function aliases: ['funcname_lower' => true].
-     * Populated by buildAliases().
      *
      * @var array<string, true>|null
      */
-    private static $internalFunctions = null;
+    private static ?array $internalFunctions = null;
 
-    /** Tracks the Dump::$aliases count used when internalMethods/Functions were last built. */
-    private static $aliasesCount = -1;
+    private static int $aliasesCount = -1;
 
-    /** Cached result of function_exists('mb_substr'). */
-    private static $hasMbSubstr = null;
-
-    /** Cached result of function_exists('mb_strlen'). */
-    private static $hasMbStrlen = null;
-
-    /** Cached result of function_exists('mb_detect_encoding'). */
-    private static $hasMbDetect = null;
-
-    /** Cached result of function_exists('iconv'). */
-    private static $hasIconv = null;
-
-    /** Cached result of function_exists('array_is_list'). */
-    private static $hasArrayIsList = null;
-
-    /**
-     * @return bool true on PHP >= 5.3
-     */
-    public static function php53orLater()
-    {
-        if (!isset(self::$_php53)) {
-            self::$_php53 = version_compare(PHP_VERSION, '5.3.0') > 0;
-        }
-
-        return self::$_php53;
-    }
-
-    /**
-     * @return bool
-     */
-    public static function isRichMode()
+    public static function isRichMode(): bool
     {
         return Dump::enabled() === Dump::MODE_RICH;
     }
 
-    /**
-     * @return bool true in MODE_RICH or MODE_PLAIN
-     */
-    public static function isHtmlMode()
+    public static function isHtmlMode(): bool
     {
-        $enabledMode = Dump::enabled();
-
-        return $enabledMode === Dump::MODE_RICH || $enabledMode === Dump::MODE_PLAIN;
+        $mode = Dump::enabled();
+        return $mode === Dump::MODE_RICH || $mode === Dump::MODE_PLAIN;
     }
 
     /**
      * Shortens an absolute file path by removing the common root shared with the package directory.
-     *
-     * @param string $file absolute path
-     * @return string
      */
-    public static function shortenPath($file)
+    public static function shortenPath(string $file): string
     {
         $file = str_replace('\\', '/', $file);
 
-        if (!isset(self::$projectRootDir)) {
+        if (self::$projectRootDir === null) {
             self::$projectRootDir = '';
 
             $dumpperPathParts = explode('/', str_replace('\\', '/', Dump::dir()));
-            $filePathParts = explode('/', $file);
+            $filePathParts    = explode('/', $file);
             foreach ($filePathParts as $i => $filePart) {
                 if (!isset($dumpperPathParts[$i]) || $dumpperPathParts[$i] !== $filePart) {
                     break;
@@ -125,7 +82,7 @@ class DumpHelper
             }
         }
 
-        if (self::$projectRootDir && strpos($file, self::$projectRootDir) === 0) {
+        if (self::$projectRootDir !== '' && str_starts_with($file, self::$projectRootDir)) {
             return substr($file, strlen(self::$projectRootDir));
         }
 
@@ -134,13 +91,9 @@ class DumpHelper
 
     /**
      * Rebuilds the internal aliases lookup tables from Dump::$aliases.
-     *
-     * Uses a count-based cache so it is essentially free on repeated calls when aliases
-     * have not changed (the common case).
-     *
-     * @return void
+     * Uses a count-based cache so it is essentially free when aliases have not changed.
      */
-    public static function buildAliases()
+    public static function buildAliases(): void
     {
         $count = count(Dump::$aliases);
         if ($count === self::$aliasesCount && self::$internalMethods !== null) {
@@ -148,16 +101,16 @@ class DumpHelper
         }
         self::$aliasesCount = $count;
 
-        self::$internalMethods = array(
-            'flames\dumpper\dump' => array('dump' => true, 'dodump' => true, 'trace' => true),
-        );
-        self::$internalFunctions = array();
+        self::$internalMethods = [
+            'flames\dumpper\dump' => ['dump' => true, 'dodump' => true, 'trace' => true],
+        ];
+        self::$internalFunctions = [];
 
         foreach (Dump::$aliases as $alias) {
             $alias = strtolower($alias);
-            if (strpos($alias, '::') !== false) {
-                $parts = explode('::', $alias, 2);
-                self::$internalMethods[$parts[0]][$parts[1]] = true;
+            if (str_contains($alias, '::')) {
+                [$class, $method] = explode('::', $alias, 2);
+                self::$internalMethods[$class][$method] = true;
             } else {
                 self::$internalFunctions[$alias] = true;
             }
@@ -166,147 +119,75 @@ class DumpHelper
 
     /**
      * Returns whether the given trace step originates inside Dump or one of its wrappers.
-     *
-     * O(1) hash-map lookup instead of a linear scan.
-     *
-     * @param array $step
-     * @return bool
      */
-    public static function stepIsInternal($step)
+    public static function stepIsInternal(array $step): bool
     {
         if (isset($step['class'])) {
-            $class = strtolower($step['class']);
-            $func  = strtolower($step['function']);
-            return isset(self::$internalMethods[$class][$func]);
+            return isset(
+                self::$internalMethods[strtolower($step['class'])][strtolower($step['function'])]
+            );
         }
 
         return isset(self::$internalFunctions[strtolower($step['function'])]);
     }
 
     /**
-     * Multibyte-aware substr wrapper.
-     *
-     * @param string      $string
-     * @param int         $start
-     * @param int|null    $end
-     * @param string|null $encoding
-     * @return string
+     * Multibyte-aware substr wrapper (mbstring always available on PHP 8.5).
      */
-    public static function substr($string, $start, $end, $encoding = null)
+    public static function substr(string $string, int $start, ?int $end, ?string $encoding = null): string
     {
-        if (!isset($string)) {
+        if ($string === '') {
             return '';
         }
 
-        if (self::$hasMbSubstr === null) {
-            self::$hasMbSubstr = function_exists('mb_substr');
-        }
-        if (self::$hasMbSubstr) {
-            $encoding = $encoding ?: self::detectEncoding($string);
-            return mb_substr($string, $start, $end, $encoding);
-        }
-
-        return substr($string, $start, $end);
+        $encoding ??= self::detectEncoding($string);
+        return mb_substr($string, $start, $end, $encoding);
     }
 
     /**
      * Returns true if the array is a sequential (0-indexed) list.
-     *
-     * Uses array_is_list() (PHP 8.1+) when available for maximum performance,
-     * otherwise falls back to a single-pass O(n) loop.
-     *
-     * @param array $array
-     * @return bool
      */
-    public static function isArraySequential(array $array)
+    public static function isArraySequential(array $array): bool
     {
-        if (self::$hasArrayIsList === null) {
-            self::$hasArrayIsList = function_exists('array_is_list');
-        }
-        if (self::$hasArrayIsList) {
-            return array_is_list($array);
-        }
-
-        $i = 0;
-        foreach ($array as $k => $_) {
-            if ($k !== $i++) {
-                return false;
-            }
-        }
-        return true;
+        return array_is_list($array);
     }
 
     /**
      * Detects the character encoding of a string.
-     *
-     * @param string $value
-     * @return string encoding label (e.g. 'UTF-8')
      */
-    public static function detectEncoding($value)
+    public static function detectEncoding(string $value): string
     {
-        if (self::$hasMbDetect === null) {
-            self::$hasMbDetect = function_exists('mb_detect_encoding');
+        $detected = mb_detect_encoding($value, null, true);
+
+        if ($detected === false || $detected === 'ASCII') {
+            return 'UTF-8';
         }
 
-        $mbDetected = null;
-        if (self::$hasMbDetect) {
-            $mbDetected = mb_detect_encoding($value);
-            if ($mbDetected === 'ASCII') {
-                return 'UTF-8';
-            }
-        }
-
-        if (self::$hasIconv === null) {
-            self::$hasIconv = function_exists('iconv');
-        }
-        if (!self::$hasIconv) {
-            return !empty($mbDetected) ? $mbDetected : 'UTF-8';
-        }
-
-        $md5 = md5($value);
-        foreach (Dump::$charEncodings as $encoding) {
-            if (md5(@iconv($encoding, $encoding, $value)) === $md5) {
+        foreach (Dump::$charEncodings ?? [] as $encoding) {
+            if (mb_check_encoding($value, $encoding)) {
                 return $encoding;
             }
         }
 
-        return 'UTF-8';
+        return $detected;
     }
 
     /**
-     * Multibyte-aware strlen wrapper.
-     *
-     * @param string      $string
-     * @param string|null $encoding
-     * @return int
+     * Multibyte-aware strlen wrapper (mbstring always available on PHP 8.5).
      */
-    public static function strlen($string, $encoding = null)
+    public static function strlen(string $string, ?string $encoding = null): int
     {
-        if (self::$hasMbStrlen === null) {
-            self::$hasMbStrlen = function_exists('mb_strlen');
-        }
-        if (self::$hasMbStrlen) {
-            $encoding = $encoding ?: self::detectEncoding($string);
-            return mb_strlen($string, $encoding);
-        }
-
-        return strlen($string);
+        $encoding ??= self::detectEncoding($string);
+        return mb_strlen($string, $encoding);
     }
 
     /**
      * Builds a clickable IDE link for a file:line reference.
-     *
-     * Integrates with Flames\Environment for local/remote path mapping when available.
-     *
-     * @param string      $file     absolute path to the source file
-     * @param int|null    $line
-     * @param string|null $linkText custom anchor text; defaults to "file:line"
-     * @return string HTML anchor tag or plain text
      */
-    public static function ideLink($file, $line, $linkText = null)
+    public static function ideLink(string $file, ?int $line, ?string $linkText = null): string
     {
-        $enabledMode = Dump::enabled();
-        $file        = self::shortenPath($file);
+        $mode = Dump::enabled();
+        $file = self::shortenPath($file);
 
         $fileLine = $file;
         if ($line) {
@@ -319,8 +200,7 @@ class DumpHelper
             return $fileLine;
         }
 
-        $linkText = $linkText ? $linkText : $fileLine;
-        $linkText = self::esc($linkText);
+        $linkText = $linkText ? self::esc($linkText) : self::esc($fileLine);
 
         if (!Dump::$editor) {
             return $linkText;
@@ -328,40 +208,36 @@ class DumpHelper
 
         $realPath = $file;
 
-        /* Resolve remote→local path mapping via Flames\Environment when available */
         if (class_exists('Flames\Environment', false)) {
-            $environment = Flames\Environment::default();
+            $environment = \Flames\Environment::default();
             $localPath   = $environment->DUMP_LOCAL_PATH ?? null;
             $remotePath  = $environment->DUMP_REMOTE_PATH ?? null;
 
             if (!empty($localPath) && !empty($remotePath)) {
-                $files = get_included_files();
-                foreach ($files as $_file) {
-                    if (\Flames\Collection\Strings::endsWith($_file, $file)) {
+                foreach (get_included_files() as $_file) {
+                    if (str_ends_with($_file, $file)) {
                         $realPath = $_file;
                         break;
                     }
                 }
 
                 $realPath = \Flames\Collection\Strings::sub($realPath, \Flames\Collection\Strings::length($remotePath));
-                $realPath = ($localPath . $realPath);
-
-                if (\Flames\Collection\Strings::contains($realPath, '\\') === true) {
-                    $realPath = str_replace('/', '\\', $realPath);
-                } else {
-                    $realPath = str_replace('\\', '/', $realPath);
-                }
+                $realPath = $localPath . $realPath;
+                $realPath = str_contains($realPath, '\\')
+                    ? str_replace('/', '\\', $realPath)
+                    : str_replace('\\', '/', $realPath);
             }
         }
 
+        $editorTemplate = self::$editors[Dump::$editor] ?? Dump::$editor;
         $ideLink = str_replace(
-            array('%file', '%line', Dump::$fileLinkServerPath),
-            array($realPath, $line, Dump::$fileLinkLocalPath),
-            isset(self::$editors[Dump::$editor]) ? self::$editors[Dump::$editor] : Dump::$editor
+            ['%file', '%line', Dump::$fileLinkServerPath],
+            [$realPath, $line, Dump::$fileLinkLocalPath],
+            $editorTemplate
         );
 
-        if ($enabledMode === Dump::MODE_RICH) {
-            $class = (strpos($ideLink, 'http://') === 0) ? ' class="_dumpper-ide-link" ' : ' ';
+        if ($mode === Dump::MODE_RICH) {
+            $class = str_starts_with($ideLink, 'http://') ? ' class="_dumpper-ide-link" ' : ' ';
             return "<a{$class}href=\"{$ideLink}\">{$linkText}</a>";
         }
 
@@ -370,79 +246,54 @@ class DumpHelper
 
     /**
      * Escapes a value for safe HTML output and optionally renders invisible characters visibly.
-     *
-     * @param mixed $value
-     * @param bool  $decode whether to make invisible characters visible
-     * @return string
      */
-    public static function esc($value, $decode = true)
+    public static function esc(mixed $value, bool $decode = true): string
     {
-        $value = self::isHtmlMode()
-            ? htmlspecialchars($value, ENT_NOQUOTES, 'UTF-8')
-            : $value;
+        $htmlMode = self::isHtmlMode();
+        $str      = $htmlMode
+            ? htmlspecialchars((string)$value, ENT_NOQUOTES, 'UTF-8')
+            : (string)$value;
 
-        if ($decode) {
-            $value = self::decodeStr($value);
-        }
-
-        return $value;
+        return $decode ? self::decodeStr($str, $htmlMode) : $str;
     }
 
     /**
-     * Makes all invisible characters visible. HTML-escapes if in HTML mode.
+     * Makes all invisible characters visible.
      *
-     * @param mixed $value
-     * @return string
+     * Handles control chars: \v(11), \f(12), \033(27) via str_replace;
+     * remaining 0-8, 14-26, 28-31 via preg_replace_callback.
+     * Chars 9(\t), 10(\n), 13(\r) are passed through unchanged.
      */
-    private static function decodeStr($value)
+    private static function decodeStr(string $value, bool $htmlMode): string
     {
-        if (is_int($value)) {
-            return (string)$value;
-        }
         if ($value === '') {
             return '';
         }
 
-        if (self::isHtmlMode()) {
+        if ($htmlMode) {
             if (htmlspecialchars($value, ENT_NOQUOTES, 'UTF-8') === '') {
                 return '‹binary data›';
             }
 
-            $controlCharsMap = array(
-                "\v"   => '<u>\v</u>',
-                "\f"   => '<u>\f</u>',
-                "\033" => '<u>\e</u>',
-                "\t"   => "\t<u>\\t</u>",
-                "\r\n" => "<u>\\r\\n</u>\n",
-                "\n"   => "<u>\\n</u>\n",
-                "\r"   => "<u>\\r</u>",
+            $value = str_replace(
+                ["\v",          "\f",          "\033"      ],
+                ['<u>\v</u>', '<u>\f</u>', '<u>\e</u>'],
+                $value
             );
-            $replaceTemplate = '<u>‹0x%d›</u>';
-        } else {
-            $controlCharsMap = array(
-                "\v"   => '\v',
-                "\f"   => '\f',
-                "\033" => '\e',
-            );
-            $replaceTemplate = '\x%02X';
+
+            return preg_replace_callback(
+                '/[\x00-\x08\x0E-\x1A\x1C-\x1F]/',
+                static fn($m) => '<u>‹0x' . ord($m[0]) . '›</u>',
+                $value
+            ) ?? $value;
         }
 
-        $out = '';
-        $i   = 0;
-        do {
-            $character = $value[$i];
-            $ord       = ord($character);
-            if ($ord < 32 && $ord !== 9 && $ord !== 10 && $ord !== 13) {
-                if (isset($controlCharsMap[$character])) {
-                    $out .= $controlCharsMap[$character];
-                } else {
-                    $out .= sprintf($replaceTemplate, $ord);
-                }
-            } else {
-                $out .= $character;
-            }
-        } while (isset($value[++$i]));
+        $value = str_replace(["\v", "\f", "\033"], ['\v', '\f', '\e'], $value);
 
-        return $out;
+        return preg_replace_callback(
+            '/[\x00-\x08\x0E-\x1A\x1C-\x1F]/',
+            static fn($m) => sprintf('\x%02X', ord($m[0])),
+            $value
+        ) ?? $value;
     }
 }

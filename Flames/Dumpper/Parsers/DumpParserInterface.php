@@ -11,17 +11,13 @@ interface DumpParserInterface
 {
     /**
      * Whether a successful parse stops all subsequent parsers from running.
-     *
-     * @return bool
      */
-    public function replacesAllOtherParsers();
+    public function replacesAllOtherParsers(): bool;
 
     /**
      * Attempts to parse $variable and populate $varData.
      *
-     * @param mixed $variable
-     * @param mixed $varData  DumpVariableData instance
      * @return false|void  false = did not handle (try next parser), void = handled
      */
-    public function parse(&$variable, $varData);
+    public function parse(mixed &$variable, mixed $varData): mixed;
 }

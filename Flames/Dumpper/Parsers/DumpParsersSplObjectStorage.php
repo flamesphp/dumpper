@@ -13,18 +13,14 @@ use SplObjectStorage;
  */
 class DumpParsersSplObjectStorage implements DumpParserInterface
 {
-    /** @return bool */
-    public function replacesAllOtherParsers()
+    public function replacesAllOtherParsers(): bool
     {
         return false;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function parse(&$variable, $varData)
+    public function parse(mixed &$variable, mixed $varData): mixed
     {
-        if (!DumpHelper::isRichMode() || !is_object($variable) || !$variable instanceof SplObjectStorage) {
+        if (!DumpHelper::isRichMode() || !$variable instanceof SplObjectStorage) {
             return false;
         }
 
@@ -33,13 +29,9 @@ class DumpParsersSplObjectStorage implements DumpParserInterface
             return false;
         }
 
-        $variable->rewind();
-        $arrayCopy = array();
-        while ($variable->valid()) {
-            $arrayCopy[] = $variable->current();
-            $variable->next();
-        }
+        $arrayCopy = iterator_to_array($variable, false);
 
         $varData->addTabToView($variable, "Storage contents ({$count})", $arrayCopy);
+        return null;
     }
 }

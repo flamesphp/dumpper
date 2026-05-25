@@ -15,41 +15,36 @@ use Flames\Dumpper\Dump;
  */
 class DumpDecoratorsPlain implements DumpDecoratorsInterface
 {
-    protected static $needsAssets = true;
+    protected static bool $needsAssets = true;
 
-    /* Repeated methods (instead of sharing with DumpDecoratorsRich) to avoid static-variable
-       confusion on old PHP versions when instantiating by dynamic class name. */
+    private static ?bool $_enableColors = null;
 
-    /** @return bool */
-    public function areAssetsNeeded()
+    /** @var array<int, int> */
+    private static array $levelColors = [];
+
+    public function areAssetsNeeded(): bool
     {
         return self::$needsAssets;
     }
 
-    /** @param bool $added */
-    public function setAssetsNeeded($added)
+    public function setAssetsNeeded(bool $added): void
     {
         self::$needsAssets = $added;
     }
 
-    private static $_enableColors;
-    private static $levelColors = array();
-
-    /**
-     * {@inheritdoc}
-     */
-    public function decorate(DumpVariableData $varData, $level = 0)
+    public function decorate(DumpVariableData $varData, int $level = 0): string
     {
         $output = '';
         if ($level === 0) {
-            $name       = $varData->name ? $varData->name : '';
+            $name          = $varData->name ? $varData->name : '';
             $varData->name = null;
-            $output    .= $this->title($name);
+            $output       .= $this->title((string)$name);
         }
 
         self::$levelColors = array_slice(self::$levelColors, 0, $level);
         $s     = '    ';
         $space = '';
+
         if (Dump::enabled() === Dump::MODE_CLI) {
             for ($i = 0; $i < $level; $i++) {
                 if (!array_key_exists($i, self::$levelColors)) {
@@ -90,11 +85,9 @@ class DumpDecoratorsPlain implements DumpDecoratorsInterface
     }
 
     /**
-     * {@inheritdoc}
-     *
      * @param DumpTraceStep[] $traceData
      */
-    public function decorateTrace(array $traceData, $pathsOnly = false)
+    public function decorateTrace(array $traceData, bool $pathsOnly = false): string
     {
         $lastStepNumber = count($traceData);
         $stepNumber     = 1;
@@ -104,6 +97,7 @@ class DumpDecoratorsPlain implements DumpDecoratorsInterface
         $____Arguments____ = '    ┌────────────────────────── Arguments ─────────────────────────────────┐';
         $__Callee_Object__ = '    ┌───────────────────────── Callee Object ──────────────────────────────┐';
         $L________________ = '    └──────────────────────────────────────────────────────────────────────┘';
+
         $_________________  = $this->colorize($_________________, 'header');
         $____Arguments____  = $this->colorize($____Arguments____, 'header');
         $__Callee_Object__  = $this->colorize($__Callee_Object__, 'header');
@@ -114,8 +108,7 @@ class DumpDecoratorsPlain implements DumpDecoratorsInterface
             $output .= $this->colorize($step->fileLine, 'header');
 
             if ($step->functionName) {
-                $output .= '    ' . $step->functionName;
-                $output .= PHP_EOL;
+                $output .= '    ' . $step->functionName . PHP_EOL;
             }
 
             if (!$pathsOnly && $step->arguments) {
@@ -140,56 +133,49 @@ class DumpDecoratorsPlain implements DumpDecoratorsInterface
         return $output;
     }
 
-    /**
-     * @param string $text
-     * @param string $type  key|access|value|type|header
-     * @param bool   $nlAfter
-     * @return string
-     */
-    private function colorize($text, $type, $nlAfter = true)
+    private function colorize(mixed $text, string $type, bool $nlAfter = true): string
     {
-        $nl = $nlAfter ? PHP_EOL : '';
+        $text = (string)$text;
+        $nl   = $nlAfter ? PHP_EOL : '';
 
-        switch (Dump::enabled()) {
-            case Dump::MODE_PLAIN:
-                if (!self::$_enableColors) {
-                    return $text . $nl;
-                }
-                switch ($type) {
-                    case 'key':    $text = "<dfn>{$text}</dfn>"; break;
-                    case 'access': $text = "<i>{$text}</i>";     break;
-                    case 'value':  $text = "<var>{$text}</var>"; break;
-                    case 'type':   $text = "<b>{$text}</b>";     break;
-                    case 'header': $text = "<h1>{$text}</h1>";   break;
-                }
+        $mode = Dump::enabled();
+
+        if ($mode === Dump::MODE_PLAIN) {
+            if (!self::$_enableColors) {
                 return $text . $nl;
-
-            case Dump::MODE_CLI:
-                if (!self::$_enableColors) {
-                    return $text . $nl;
-                }
-                $optionsMap = array(
-                    'key'    => "\x1b[32m",
-                    'access' => "\x1b[3m",
-                    'header' => "\x1b[38;5;75m",
-                    'type'   => "\x1b[1m",
-                    'value'  => "\x1b[31m",
-                );
-                return $optionsMap[$type] . $text . "\x1b[0m" . $nl;
-
-            case Dump::MODE_TEXT_ONLY:
-            default:
-                return $text . $nl;
+            }
+            $text = match ($type) {
+                'key'    => "<dfn>{$text}</dfn>",
+                'access' => "<i>{$text}</i>",
+                'value'  => "<var>{$text}</var>",
+                'type'   => "<b>{$text}</b>",
+                'header' => "<h1>{$text}</h1>",
+                default  => $text,
+            };
+            return $text . $nl;
         }
+
+        if ($mode === Dump::MODE_CLI) {
+            if (!self::$_enableColors) {
+                return $text . $nl;
+            }
+            $ansi = match ($type) {
+                'key'    => "\x1b[32m",
+                'access' => "\x1b[3m",
+                'header' => "\x1b[38;5;75m",
+                'type'   => "\x1b[1m",
+                'value'  => "\x1b[31m",
+                default  => '',
+            };
+            return $ansi . $text . "\x1b[0m" . $nl;
+        }
+
+        return $text . $nl;
     }
 
-    /**
-     * @param string $text
-     * @return string
-     */
-    private function title($text)
+    private function title(string $text): string
     {
-        $escaped         = DumpHelper::esc($text);
+        $escaped          = DumpHelper::esc($text);
         $lengthDifference = strlen($escaped) - strlen($text);
 
         $ret  = '┌──────────────────────────────────────────────────────────────────────────────┐' . PHP_EOL;
@@ -201,25 +187,15 @@ class DumpDecoratorsPlain implements DumpDecoratorsInterface
         return $this->colorize($ret, 'header');
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function wrapStart()
+    public function wrapStart(): string
     {
-        if (Dump::enabled() === Dump::MODE_PLAIN) {
-            return '<pre class="_dumpper_plain">';
-        }
-
-        return '';
+        return Dump::enabled() === Dump::MODE_PLAIN ? '<pre class="_dumpper_plain">' : '';
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function wrapEnd($callee, $miniTrace, $prevCaller)
+    public function wrapEnd(array $callee, array $miniTrace, array $prevCaller): string
     {
-        $lastLine = '════════════════════════════════════════════════════════════════════════════════';
-        $lastChar = Dump::enabled() === Dump::MODE_PLAIN ? '</pre>' : '';
+        $lastLine     = '════════════════════════════════════════════════════════════════════════════════';
+        $lastChar     = Dump::enabled() === Dump::MODE_PLAIN ? '</pre>' : '';
         $traceDisplay = '';
 
         if (!Dump::$displayCalledFrom) {
@@ -241,18 +217,14 @@ class DumpDecoratorsPlain implements DumpDecoratorsInterface
 
         return $this->colorize(
                 $lastLine . PHP_EOL
-                . 'Call stack ' . DumpHelper::ideLink($callee['file'], $callee['line'])
+                . 'Call stack ' . DumpHelper::ideLink($callee['file'], $callee['line'] ?? null)
                 . $traceDisplay,
                 'header'
             )
             . $lastChar;
     }
 
-    /**
-     * @param DumpVariableData $varData
-     * @return string
-     */
-    private function drawHeader(DumpVariableData $varData)
+    private function drawHeader(DumpVariableData $varData): string
     {
         $output = '';
 
@@ -273,16 +245,13 @@ class DumpDecoratorsPlain implements DumpDecoratorsInterface
         $output .= ' ' . $this->colorize($type, 'type', false);
 
         if ($varData->value !== null && $varData->value !== '') {
-            $output .= ' ' . $this->colorize($varData->value, 'value', false);
+            $output .= ' ' . $this->colorize((string)$varData->value, 'value', false);
         }
 
         return ltrim($output);
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function init()
+    public function init(): string
     {
         if (!Dump::$cliColors) {
             self::$_enableColors = false;
