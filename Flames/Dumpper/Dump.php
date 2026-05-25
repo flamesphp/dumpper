@@ -278,8 +278,7 @@ class Dump
     public static function dump($data = null)
     {
         try {
-            $params = func_get_args();
-            return call_user_func_array(array('Flames\Dumpper\Dump', 'doDump'), $params);
+            return self::doDump(...func_get_args());
         } catch (\Throwable $e) {
         }
 
@@ -304,8 +303,17 @@ class Dump
 
         list($names, $modifiers, $callee, $previousCaller, $miniTrace) = self::_getCalleeInfo();
 
+        // Pre-compute all modifier flags in one pass to avoid repeated strpos calls.
+        $hasMods  = !empty($modifiers);
+        $modPrint = $hasMods && strpos($modifiers, 'print') !== false;
+        $modTilde = $hasMods && strpos($modifiers, '~')     !== false;
+        $modMinus = $hasMods && strpos($modifiers, '-')     !== false;
+        $modPlus  = $hasMods && strpos($modifiers, '+')     !== false;
+        $modBang  = $hasMods && strpos($modifiers, '!')     !== false;
+        $modAt    = $hasMods && strpos($modifiers, '@')     !== false;
+
         if ($enabledMode === true) {
-            if (!empty($modifiers) && strpos($modifiers, 'print') !== false && isset($callee['file'])) {
+            if ($modPrint && isset($callee['file'])) {
                 $newMode = self::MODE_RICH;
             } elseif (self::$outputFile && substr(self::$outputFile, -5) === '.html') {
                 $newMode = self::MODE_RICH;
@@ -322,7 +330,7 @@ class Dump
                 }
             }
 
-            if (!empty($modifiers) && strpos($modifiers, '~') !== false) {
+            if ($modTilde) {
                 switch ($newMode) {
                     case self::MODE_RICH:  $newMode = self::MODE_PLAIN;     break;
                     case self::MODE_PLAIN:
@@ -343,21 +351,21 @@ class Dump
 
         $firstRunOldValue = $decorator->areAssetsNeeded();
 
-        if (!empty($modifiers) && strpos($modifiers, '-') !== false) {
+        if ($modMinus) {
             $decorator->setAssetsNeeded(true);
             while (ob_get_level()) {
                 ob_end_clean();
             }
         }
-        if (!empty($modifiers) && strpos($modifiers, '+') !== false) {
+        if ($modPlus) {
             $expandedByDefaultOldValue = self::$expandedByDefault;
             self::$expandedByDefault = true;
         }
-        if (!empty($modifiers) && strpos($modifiers, '!') !== false) {
+        if ($modBang) {
             $maxLevelsOldValue = self::$maxLevels;
             self::$maxLevels = false;
         }
-        if (!empty($modifiers) && strpos($modifiers, '@') !== false) {
+        if ($modAt) {
             $returnOldValue = self::$returnOutput;
             self::$returnOutput = true;
         }
@@ -370,7 +378,7 @@ class Dump
             }
         }
 
-        if (!empty($modifiers) && strpos($modifiers, 'print') !== false && isset($callee['file'])) {
+        if ($modPrint && isset($callee['file'])) {
             $outputFileOldValue = self::$outputFile;
             self::$outputFile = dirname($callee['file']) . '/dumpper.html';
         }
@@ -446,25 +454,25 @@ class Dump
         self::enabled($enabledMode);
         $decorator->setAssetsNeeded(false);
 
-        if (!empty($modifiers)) {
-            if (strpos($modifiers, '~') !== false) {
+        if ($hasMods) {
+            if ($modTilde) {
                 $decorator->setAssetsNeeded($firstRunOldValue);
             }
-            if (strpos($modifiers, '+') !== false) {
+            if ($modPlus) {
                 self::$expandedByDefault = $expandedByDefaultOldValue;
             }
             if (isset($maxLevelsOldValue)) {
                 self::$maxLevels = $maxLevelsOldValue;
             }
-            if (!empty($modifiers) && strpos($modifiers, 'print') !== false && isset($callee['file'])) {
+            if ($modPrint && isset($callee['file'])) {
                 $tmp = self::$outputFile;
                 self::$outputFile = $outputFileOldValue;
-                if (strpos($modifiers, '@') === false) {
+                if (!$modAt) {
                     echo 'Dump -> ' . $tmp . PHP_EOL;
                 }
                 return 5463;
             }
-            if (strpos($modifiers, '@') !== false) {
+            if ($modAt) {
                 self::$returnOutput = $returnOldValue;
                 $decorator->setAssetsNeeded($firstRunOldValue);
                 return $output;
@@ -735,23 +743,6 @@ class Dump
         return $output;
     }
 
-    /**
-     * Initialises a setting from php.ini if not yet explicitly set.
-     *
-     * @param string $name
-     * @param mixed  $default
-     */
-    private static function _initSetting($name, $default)
-    {
-        if (!isset(self::$$name)) {
-            $value = get_cfg_var('dumpper.' . $name);
-            if (!$value) {
-                $value = $default;
-            }
-            self::$$name = $value;
-        }
-    }
-
     private static $loadedParsers = 0;
 
     /**
@@ -770,9 +761,13 @@ class Dump
 
         if (self::$loadedParsers !== $parsersCount) {
             self::$loadedParsers = $parsersCount;
+            $dir = self::dir() . 'Parsers/';
             foreach (Dump::$enabledParsers as $className => $enabled) {
-                if ($enabled && file_exists($f = self::dir() . 'Parsers/' . $className . '.php')) {
-                    require_once $f;
+                if ($enabled) {
+                    $f = $dir . $className . '.php';
+                    if (file_exists($f)) {
+                        require_once $f;
+                    }
                 }
             }
         }
@@ -781,26 +776,22 @@ class Dump
             return;
         }
 
-        self::_initSetting(
-            'editor',
-            ini_get('xdebug.file_link_format') ? ini_get('xdebug.file_link_format') : 'phpstorm-remote'
-        );
-        self::_initSetting('fileLinkServerPath', null);
-        self::_initSetting('fileLinkLocalPath', null);
-        self::_initSetting('displayCalledFrom', true);
-        self::_initSetting('maxLevels', 7);
-        self::_initSetting('expandedByDefault', false);
-        self::_initSetting('cliDetection', true);
-        self::_initSetting('cliColors', true);
-        self::_initSetting(
-            'charEncodings',
-            array(
-                'UTF-8',
-                'Windows-1252',
-                'euc-jp',
-            )
-        );
-        self::_initSetting('returnOutput', false);
-        self::_initSetting('aliases', array());
+        self::$_initialized = true;
+
+        if (!isset(self::$editor)) {
+            self::$editor = ini_get('xdebug.file_link_format') ?: 'phpstorm-remote';
+        }
+        if (!isset(self::$fileLinkServerPath)) { self::$fileLinkServerPath = null; }
+        if (!isset(self::$fileLinkLocalPath))  { self::$fileLinkLocalPath  = null; }
+        if (!isset(self::$displayCalledFrom))  { self::$displayCalledFrom  = true; }
+        if (!isset(self::$maxLevels))          { self::$maxLevels          = 7; }
+        if (!isset(self::$expandedByDefault))  { self::$expandedByDefault  = false; }
+        if (!isset(self::$cliDetection))       { self::$cliDetection       = true; }
+        if (!isset(self::$cliColors))          { self::$cliColors          = true; }
+        if (!isset(self::$charEncodings)) {
+            self::$charEncodings = array('UTF-8', 'Windows-1252', 'euc-jp');
+        }
+        if (!isset(self::$returnOutput)) { self::$returnOutput = false; }
+        if (!isset(self::$aliases))      { self::$aliases      = array(); }
     }
 }

@@ -36,8 +36,41 @@ class DumpHelper
         'xdebug'                 => 'xdebug://%file@%line',
     );
 
-    private static $aliasesRaw;
     private static $projectRootDir;
+
+    /**
+     * Hash-map of internal method aliases: ['classname_lower' => ['methodname_lower' => true]].
+     * Populated by buildAliases().
+     *
+     * @var array<string, array<string, true>>|null
+     */
+    private static $internalMethods = null;
+
+    /**
+     * Hash-map of internal function aliases: ['funcname_lower' => true].
+     * Populated by buildAliases().
+     *
+     * @var array<string, true>|null
+     */
+    private static $internalFunctions = null;
+
+    /** Tracks the Dump::$aliases count used when internalMethods/Functions were last built. */
+    private static $aliasesCount = -1;
+
+    /** Cached result of function_exists('mb_substr'). */
+    private static $hasMbSubstr = null;
+
+    /** Cached result of function_exists('mb_strlen'). */
+    private static $hasMbStrlen = null;
+
+    /** Cached result of function_exists('mb_detect_encoding'). */
+    private static $hasMbDetect = null;
+
+    /** Cached result of function_exists('iconv'). */
+    private static $hasIconv = null;
+
+    /** Cached result of function_exists('array_is_list'). */
+    private static $hasArrayIsList = null;
 
     /**
      * @return bool true on PHP >= 5.3
@@ -100,27 +133,33 @@ class DumpHelper
     }
 
     /**
-     * Rebuilds the internal aliases list from Dump::$aliases.
+     * Rebuilds the internal aliases lookup tables from Dump::$aliases.
+     *
+     * Uses a count-based cache so it is essentially free on repeated calls when aliases
+     * have not changed (the common case).
      *
      * @return void
      */
     public static function buildAliases()
     {
-        self::$aliasesRaw = array(
-            'methods'   => array(
-                array('flames\dumpper\dump', 'dump'),
-                array('flames\dumpper\dump', 'doDump'),
-                array('flames\dumpper\dump', 'trace'),
-            ),
-            'functions' => array(),
+        $count = count(Dump::$aliases);
+        if ($count === self::$aliasesCount && self::$internalMethods !== null) {
+            return;
+        }
+        self::$aliasesCount = $count;
+
+        self::$internalMethods = array(
+            'flames\dumpper\dump' => array('dump' => true, 'dodump' => true, 'trace' => true),
         );
+        self::$internalFunctions = array();
 
         foreach (Dump::$aliases as $alias) {
             $alias = strtolower($alias);
             if (strpos($alias, '::') !== false) {
-                self::$aliasesRaw['methods'][] = explode('::', $alias);
+                $parts = explode('::', $alias, 2);
+                self::$internalMethods[$parts[0]][$parts[1]] = true;
             } else {
-                self::$aliasesRaw['functions'][] = $alias;
+                self::$internalFunctions[$alias] = true;
             }
         }
     }
@@ -128,21 +167,20 @@ class DumpHelper
     /**
      * Returns whether the given trace step originates inside Dump or one of its wrappers.
      *
+     * O(1) hash-map lookup instead of a linear scan.
+     *
      * @param array $step
      * @return bool
      */
     public static function stepIsInternal($step)
     {
         if (isset($step['class'])) {
-            foreach (self::$aliasesRaw['methods'] as $alias) {
-                if ($alias[0] === strtolower($step['class']) && $alias[1] === strtolower($step['function'])) {
-                    return true;
-                }
-            }
-            return false;
+            $class = strtolower($step['class']);
+            $func  = strtolower($step['function']);
+            return isset(self::$internalMethods[$class][$func]);
         }
 
-        return in_array(strtolower($step['function']), self::$aliasesRaw['functions'], true);
+        return isset(self::$internalFunctions[strtolower($step['function'])]);
     }
 
     /**
@@ -160,7 +198,10 @@ class DumpHelper
             return '';
         }
 
-        if (function_exists('mb_substr')) {
+        if (self::$hasMbSubstr === null) {
+            self::$hasMbSubstr = function_exists('mb_substr');
+        }
+        if (self::$hasMbSubstr) {
             $encoding = $encoding ?: self::detectEncoding($string);
             return mb_substr($string, $start, $end, $encoding);
         }
@@ -171,13 +212,28 @@ class DumpHelper
     /**
      * Returns true if the array is a sequential (0-indexed) list.
      *
+     * Uses array_is_list() (PHP 8.1+) when available for maximum performance,
+     * otherwise falls back to a single-pass O(n) loop.
+     *
      * @param array $array
      * @return bool
      */
     public static function isArraySequential(array $array)
     {
-        $keys = array_keys($array);
-        return array_keys($keys) === $keys;
+        if (self::$hasArrayIsList === null) {
+            self::$hasArrayIsList = function_exists('array_is_list');
+        }
+        if (self::$hasArrayIsList) {
+            return array_is_list($array);
+        }
+
+        $i = 0;
+        foreach ($array as $k => $_) {
+            if ($k !== $i++) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -188,14 +244,22 @@ class DumpHelper
      */
     public static function detectEncoding($value)
     {
-        if (function_exists('mb_detect_encoding')) {
+        if (self::$hasMbDetect === null) {
+            self::$hasMbDetect = function_exists('mb_detect_encoding');
+        }
+
+        $mbDetected = null;
+        if (self::$hasMbDetect) {
             $mbDetected = mb_detect_encoding($value);
             if ($mbDetected === 'ASCII') {
                 return 'UTF-8';
             }
         }
 
-        if (!function_exists('iconv')) {
+        if (self::$hasIconv === null) {
+            self::$hasIconv = function_exists('iconv');
+        }
+        if (!self::$hasIconv) {
             return !empty($mbDetected) ? $mbDetected : 'UTF-8';
         }
 
@@ -218,7 +282,10 @@ class DumpHelper
      */
     public static function strlen($string, $encoding = null)
     {
-        if (function_exists('mb_strlen')) {
+        if (self::$hasMbStrlen === null) {
+            self::$hasMbStrlen = function_exists('mb_strlen');
+        }
+        if (self::$hasMbStrlen) {
             $encoding = $encoding ?: self::detectEncoding($string);
             return mb_strlen($string, $encoding);
         }
@@ -296,10 +363,6 @@ class DumpHelper
         if ($enabledMode === Dump::MODE_RICH) {
             $class = (strpos($ideLink, 'http://') === 0) ? ' class="_dumpper-ide-link" ' : ' ';
             return "<a{$class}href=\"{$ideLink}\">{$linkText}</a>";
-        }
-
-        if (strpos($ideLink, 'http://') === 0) {
-            return "<a href=\"{$ideLink}\">{$linkText}</a>";
         }
 
         return "<a href=\"{$ideLink}\">{$linkText}</a>";

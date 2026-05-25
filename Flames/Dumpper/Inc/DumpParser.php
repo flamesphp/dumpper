@@ -9,7 +9,6 @@ use Flames\Dumpper\Inc\DumpHelper;
 use Flames\Dumpper\Inc\DumpVariableData;
 use Flames\Dumpper\Dump;
 use ReflectionClass;
-use ReflectionObject;
 use ReflectionProperty;
 
 /**
@@ -27,6 +26,31 @@ class DumpParser
 
     private static $parsingAlternative = array();
     private static $_placeFullStringInValue = false;
+
+    /**
+     * Cached parser instances, keyed by class short-name.
+     * Parsers are stateless between parse() calls so reuse is safe.
+     *
+     * @var array<string, object>
+     */
+    private static $parserInstances = array();
+
+    /**
+     * Cached ReflectionClass instances, keyed by class name.
+     *
+     * @var array<string, ReflectionClass>
+     */
+    private static $reflectionClasses = array();
+
+    /**
+     * Cached public property names per class: ['ClassName' => ['prop' => true]].
+     *
+     * @var array<string, array<string, true>>
+     */
+    private static $classPublicProps = array();
+
+    /** @var bool|null cached result of function_exists('spl_object_hash') */
+    private static $hasSplObjectHash = null;
 
     /**
      * Resets parser state between separate dump() calls.
@@ -67,12 +91,15 @@ class DumpParser
         }
 
         foreach (Dump::$enabledParsers as $parserClass => $enabled) {
-            if (!$enabled || array_key_exists($parserClass, self::$parsingAlternative)) {
+            if (!$enabled || isset(self::$parsingAlternative[$parserClass])) {
                 continue;
             }
             self::$parsingAlternative[$parserClass] = true;
 
-            $parser      = new ('Flames\Dumpper\Parsers\\' . $parserClass)();
+            if (!isset(self::$parserInstances[$parserClass])) {
+                self::$parserInstances[$parserClass] = new ('Flames\Dumpper\Parsers\\' . $parserClass)();
+            }
+            $parser      = self::$parserInstances[$parserClass];
             $parseResult = $parser->parse($variable, $varData);
 
             if ($parseResult !== false && $parser->replacesAllOtherParsers()) {
@@ -123,8 +150,9 @@ class DumpParser
             return false;
         }
 
-        $arrayKeys  = array();
-        $keys       = null;
+        $arrayKeys   = array();
+        $arrayKeySet = array();
+        $keys        = null;
         $closeEnough = false;
         foreach ($variable as $k => $row) {
             if (isset(self::$_marker) && $k === self::$_marker) {
@@ -150,7 +178,12 @@ class DumpParser
                 $keys = array_keys($row);
             }
 
-            $arrayKeys = array_unique(array_merge($arrayKeys, $keys));
+            foreach ($keys as $ak) {
+                if (!isset($arrayKeySet[$ak])) {
+                    $arrayKeySet[$ak] = true;
+                    $arrayKeys[]      = $ak;
+                }
+            }
         }
 
         return $arrayKeys;
@@ -333,9 +366,9 @@ class DumpParser
      */
     private static function _parse_object(&$variable, DumpVariableData $variableData)
     {
-        $hash       = self::getObjectHash($variable);
+        $hash        = self::getObjectHash($variable);
         $castedArray = (array)$variable;
-        $className  = get_class($variable);
+        $className   = get_class($variable);
         $variableData->type = $className;
         $variableData->size = count($castedArray);
 
@@ -357,7 +390,18 @@ class DumpParser
         }
 
         self::$_objects[$hash] = true;
-        $reflector = new ReflectionObject($variable);
+
+        if (!isset(self::$reflectionClasses[$className])) {
+            $rc = new ReflectionClass($className);
+            self::$reflectionClasses[$className] = $rc;
+            $props = array();
+            foreach ($rc->getProperties(ReflectionProperty::IS_PUBLIC) as $prop) {
+                $props[$prop->name] = true;
+            }
+            self::$classPublicProps[$className] = $props;
+        }
+        $reflector    = self::$reflectionClasses[$className];
+        $publicProps  = self::$classPublicProps[$className];
 
         if (DumpHelper::isHtmlMode() && $reflector->isUserDefined()) {
             $variableData->type = DumpHelper::ideLink(
@@ -369,13 +413,6 @@ class DumpParser
         $variableData->size = 0;
 
         $extendedValue = array();
-        static $publicProperties = array();
-        if (!isset($publicProperties[$className])) {
-            $reflectionClass = new ReflectionClass($className);
-            foreach ($reflectionClass->getProperties(ReflectionProperty::IS_PUBLIC) as $prop) {
-                $publicProperties[$className][$prop->name] = true;
-            }
-        }
 
         foreach ($castedArray as $key => $value) {
             $output = self::process($value);
@@ -385,7 +422,7 @@ class DumpParser
                 $key    = substr($key, strrpos($key, "\x00") + 1);
             } else {
                 $access = 'public';
-                if ($variableData->type !== 'stdClass' && !isset($publicProperties[$className][$key])) {
+                if ($className !== 'stdClass' && !isset($publicProps[$key])) {
                     if ($className !== 'Flames\Collection\Arr') {
                         $access .= ' (dynamically added)';
                     }
@@ -553,7 +590,10 @@ class DumpParser
      */
     private static function getObjectHash($variable)
     {
-        if (function_exists('spl_object_hash')) {
+        if (self::$hasSplObjectHash === null) {
+            self::$hasSplObjectHash = function_exists('spl_object_hash');
+        }
+        if (self::$hasSplObjectHash) {
             return spl_object_hash($variable);
         }
 
