@@ -286,7 +286,7 @@ class Dump
             } elseif (self::$outputFile && str_ends_with(self::$outputFile, '.html')) {
                 $newMode = self::MODE_RICH;
             } else {
-                $newMode = PHP_SAPI === 'cli' && self::$cliDetection === true
+                $newMode = \Flames\Forge\Cli::isCli()
                     ? self::MODE_CLI
                     : self::MODE_RICH;
             }

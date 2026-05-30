@@ -6,6 +6,12 @@
     "minimum-stability": "dev",
     "prefer-stable": true,
     "require": {
-        "php": ">=8.5"
+        "php": ">=8.5",
+        "ext-mbstring": "*",
+        "ext-json": "*",
+        "ext-tokenizer": "*",
+        "ext-pcre": "*",
+        "ext-spl": "*",
+        "ext-reflection": "*"
     }
 }
