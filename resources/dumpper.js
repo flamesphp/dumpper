@@ -28,11 +28,31 @@ if ("undefined" == typeof _dumpperInitialized) {
         },
         resetPanel: function (panel) {
             if (!panel) return;
+            if (panel._dumpperFallback) {
+                clearTimeout(panel._dumpperFallback);
+                panel._dumpperFallback = null;
+            }
             if (panel._dumpperEnd) {
                 panel.removeEventListener("transitionend", panel._dumpperEnd);
                 panel._dumpperEnd = null;
             }
             panel._dumpperAnimating = false;
+        },
+        panelStuck: function (panel) {
+            if (!panel) return false;
+            const maxHeight = panel.style.maxHeight;
+            return panel.style.opacity === "0" || maxHeight === "0" || maxHeight === "0px";
+        },
+        schedulePanelFallback: function (panel, hidden, trigger) {
+            panel._dumpperFallback = setTimeout(function () {
+                if (!panel._dumpperAnimating) return;
+                if (hidden) {
+                    s.v(trigger);
+                    s.finalizePanel(panel, true);
+                } else {
+                    s.finalizePanel(panel, false);
+                }
+            }, 350);
         },
         finalizePanel: function (panel, hidden) {
             s.resetPanel(panel);
@@ -51,34 +71,37 @@ if ("undefined" == typeof _dumpperInitialized) {
         },
         expand: function (e) {
             const panel = s.panel(e);
-            if (!panel || s.l(e)) return e;
+            if (!panel) return e;
+            if (s.l(e)) {
+                if (s.panelStuck(panel)) s.finalizePanel(panel, false);
+                return e;
+            }
             if (panel._dumpperAnimating) return e;
             s.g(e);
             s.resetPanel(panel);
-            panel._dumpperAnimating = true;
             panel.style.display = "block";
             panel.style.overflow = "hidden";
+            panel.style.maxHeight = "none";
+            panel.style.opacity = "1";
+            panel.style.transition = "";
+            const targetHeight = panel.scrollHeight;
+            if (!targetHeight) {
+                s.finalizePanel(panel, false);
+                return e;
+            }
+            panel._dumpperAnimating = true;
             panel.style.maxHeight = "0";
             panel.style.opacity = "0";
             panel.style.transition = "max-height .15s ease";
             panel.offsetHeight;
-            panel.style.maxHeight = panel.scrollHeight + "px";
+            panel.style.maxHeight = targetHeight + "px";
             panel._dumpperEnd = function (ev) {
                 if (ev.target !== panel || "max-height" !== ev.propertyName) return;
                 s.resetPanel(panel);
-                panel._dumpperAnimating = true;
-                panel.style.maxHeight = "none";
-                panel.style.overflow = "hidden";
-                panel.style.transition = "opacity .12s ease";
-                panel.offsetHeight;
-                panel.style.opacity = "1";
-                panel._dumpperEnd = function (ev2) {
-                    if (ev2.target !== panel || "opacity" !== ev2.propertyName) return;
-                    s.finalizePanel(panel, false);
-                };
-                panel.addEventListener("transitionend", panel._dumpperEnd);
+                s.finalizePanel(panel, false);
             };
             panel.addEventListener("transitionend", panel._dumpperEnd);
+            s.schedulePanelFallback(panel, false, e);
             return e;
         },
         collapse: function (e) {
@@ -91,24 +114,32 @@ if ("undefined" == typeof _dumpperInitialized) {
             panel.style.overflow = "hidden";
             panel.style.maxHeight = panel.scrollHeight + "px";
             panel.style.opacity = "1";
-            panel.style.transition = "opacity .1s ease, max-height .14s ease .08s";
+            panel.style.transition = "max-height .14s ease, opacity .1s ease";
             panel.offsetHeight;
-            panel.style.opacity = "0";
             panel.style.maxHeight = "0";
+            panel.style.opacity = "0";
             panel._dumpperEnd = function (ev) {
                 if (ev.target !== panel || "max-height" !== ev.propertyName) return;
                 s.v(e);
                 s.finalizePanel(panel, true);
             };
             panel.addEventListener("transitionend", panel._dumpperEnd);
+            s.schedulePanelFallback(panel, true, e);
             return e;
         },
         toggle: function (e, wasOpen) {
             wasOpen = void 0 === wasOpen ? s.l(e) : wasOpen;
             wasOpen ? s.collapse(e) : s.expand(e);
-            let n = s.next(e);
-            n && 1 === n.childNodes.length && (n = n.childNodes[0].childNodes[0]) && s.l(n, "_dumpper-parent") && s.toggle(n, wasOpen);
             return e;
+        },
+        parentToggle: function (node) {
+            if (s.l(node, "_dumpper-ide-link") || s.l(node, "_dumpper-popup-trigger")) return null;
+            while (node && !s.l(node, "_dumpper")) {
+                if ("DT" === node.tagName && s.l(node, "_dumpper-parent")) return node;
+                if ("FOOTER" === node.tagName) return node;
+                node = node.parentNode;
+            }
+            return null;
         },
         _: function (e, t) {
             void 0 === t && (t = s.l(e));
@@ -141,18 +172,60 @@ if ("undefined" == typeof _dumpperInitialized) {
             return e || null;
         },
         close: function (e) {
-            if (!e || s.l(e, "_dumpper-closing")) return;
+            if (!e || e._dumpperClosing) return;
+            e._dumpperClosing = true;
+
+            const height = e.offsetHeight;
+            const computed = window.getComputedStyle(e);
+            const marginTop = computed.marginTop;
+            const marginBottom = computed.marginBottom;
+
             s.g(e, "_dumpper-closing");
             if (-1 !== s.i && s.t[s.i] && s.root(s.t[s.i]) === e) s.R.C(-1);
-            const t = function (n) {
-                n.target === e &&
-                    "opacity" === n.propertyName &&
-                    (e.removeEventListener("transitionend", t), e.remove(), -1 !== s.i && s.T());
+
+            const finish = function () {
+                if (e._dumpperCloseDone) return;
+                e._dumpperCloseDone = true;
+                e.remove();
+                if (-1 !== s.i) s.T();
             };
-            e.addEventListener("transitionend", t);
-            setTimeout(function () {
-                e.parentNode && e.remove();
-            }, 400);
+
+            const collapseHeight = function () {
+                if (e._dumpperHeightCollapsing) return;
+                e._dumpperHeightCollapsing = true;
+
+                e.style.opacity = "0";
+                e.style.pointerEvents = "none";
+                e.style.overflow = "hidden";
+                e.style.maxHeight = height + "px";
+                e.style.marginTop = marginTop;
+                e.style.marginBottom = marginBottom;
+                e.style.transition =
+                    "max-height .28s ease, margin-top .28s ease, margin-bottom .28s ease, border-top-width .28s ease, border-bottom-width .28s ease, box-shadow .28s ease";
+                e.offsetHeight;
+                e.style.maxHeight = "0";
+                e.style.marginTop = "0";
+                e.style.marginBottom = "0";
+                e.style.borderTopWidth = "0";
+                e.style.borderBottomWidth = "0";
+                e.style.boxShadow = "none";
+
+                const onHeightEnd = function (ev) {
+                    if (ev.target !== e || "max-height" !== ev.propertyName) return;
+                    e.removeEventListener("transitionend", onHeightEnd);
+                    finish();
+                };
+                e.addEventListener("transitionend", onHeightEnd);
+                setTimeout(finish, 350);
+            };
+
+            const onOpacityEnd = function (ev) {
+                if (ev.target !== e || "opacity" !== ev.propertyName) return;
+                e.removeEventListener("transitionend", onOpacityEnd);
+                collapseHeight();
+            };
+            e.addEventListener("transitionend", onOpacityEnd);
+            setTimeout(collapseHeight, 400);
         },
         T: function () {
             (s.t = []),
@@ -234,25 +307,34 @@ if ("undefined" == typeof _dumpperInitialized) {
                 else if ("TH" === n) return e.ctrlKey || s.I(t.parentNode.parentNode.parentNode, t.cellIndex, t), !1;
                 if ("LI" === n && "_dumpper-tabs" === t.parentNode.className)
                     return "_dumpper-active-tab" !== t.className && (s.h(t), -1 !== s.i && s.T()), !1;
-                if ("NAV" === n)
-                    return "FOOTER" === t.parentNode.tagName
-                        ? ((t = t.parentNode), s.toggle(t))
-                        : setTimeout(function () {
-                              0 < parseInt(t.F, 10) ? t.F-- : (s._(t.parentNode), -1 !== s.i && s.T());
-                          }, 300),
+                if ("NAV" === n) {
+                    if ("FOOTER" === t.parentNode.tagName) return s.toggle(t.parentNode), -1 !== s.i && s.T(), e.stopPropagation(), !1;
+                    if ("DT" === t.parentNode.tagName && s.l(t.parentNode, "_dumpper-parent"))
+                        return s.toggle(t.parentNode), -1 !== s.i && s.T(), e.stopPropagation(), !1;
+                    return (
+                        setTimeout(function () {
+                            0 < parseInt(t.F, 10) ? t.F-- : (s._(t.parentNode), -1 !== s.i && s.T());
+                        }, 300),
                         e.stopPropagation(),
-                        !1;
-                if (s.l(t, "_dumpper-parent")) return s.toggle(t), -1 !== s.i && s.T(), !1;
-                if (s.l(t, "_dumpper-ide-link")) {
+                        !1
+                    );
+                }
+                if (s.l(e.target, "_dumpper-ide-link")) {
                     e.preventDefault();
                     const i = new XMLHttpRequest();
-                    i.open("get", t.href), i.send();
-                } else if (s.l(t, "_dumpper-popup-trigger")) {
-                    let e = t.parentNode;
-                    if ("FOOTER" === e.tagName) e = e.previousSibling;
-                    else for (; e && !s.l(e, "_dumpper-parent"); ) e = e.parentNode;
-                    s.A(e);
-                } else "PRE" === n && 3 === e.detail && s.o(t);
+                    i.open("get", e.target.href), i.send();
+                    return !1;
+                }
+                if (s.l(e.target, "_dumpper-popup-trigger")) {
+                    let node = e.target.parentNode;
+                    if ("FOOTER" === node.tagName) node = node.previousSibling;
+                    else for (; node && !s.l(node, "_dumpper-parent"); ) node = node.parentNode;
+                    s.A(node);
+                    return !1;
+                }
+                const toggleTarget = s.parentToggle(t);
+                if (toggleTarget) return s.toggle(toggleTarget), -1 !== s.i && s.T(), !1;
+                if ("PRE" === n && 3 === e.detail) s.o(t);
             }
         },
         !1
