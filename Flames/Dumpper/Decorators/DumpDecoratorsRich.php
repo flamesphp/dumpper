@@ -48,7 +48,7 @@ class DumpDecoratorsRich implements DumpDecoratorsInterface
         }
 
         if ($extendedPresent) {
-            $output .= '<span class="_dumpper-popup-trigger">&rarr;</span><nav></nav>';
+            $output .= '<nav></nav>';
         }
 
         $output .= $this->_drawHeader($varData) . $varData->value . '</dt>';
@@ -191,7 +191,8 @@ class DumpDecoratorsRich implements DumpDecoratorsInterface
 
     public function wrapStart(): string
     {
-        return '<div class="_dumpper">';
+        return '<div class="_dumpper">'
+            . '<button type="button" class="_dumpper-close" title="Close dump" aria-label="Close dump">&times;</button>';
     }
 
     public function wrapEnd(array $callee, array $miniTrace, array $prevCaller): string
@@ -246,7 +247,6 @@ class DumpDecoratorsRich implements DumpDecoratorsInterface
         $callingFunction .= ' @ ' . date('Y-m-d H:i:s');
 
         return '<footer>'
-            . '<span class="_dumpper-popup-trigger" title="Open in new window">&rarr;</span> '
             . "{$calleeInfo}{$callingFunction}{$traceDisplay}"
             . '</footer></div>';
     }
@@ -274,7 +274,7 @@ class DumpDecoratorsRich implements DumpDecoratorsInterface
     }
 
     /**
-     * Produces the CSS and JS assets needed for rich display (cached after first load).
+     * Produces the inline CSS and JS assets needed for rich display (cached after first load).
      */
     public function init(): string
     {
@@ -284,11 +284,7 @@ class DumpDecoratorsRich implements DumpDecoratorsInterface
 
         $baseDir = Dump::dir() . '../../resources/';
 
-        $defaultCss = str_replace(
-            'body{background:#073642;color:#fff}',
-            '',
-            (string)file_get_contents($baseDir . 'solarized-dark.css')
-        );
+        $defaultCss = (string)file_get_contents($baseDir . 'material-kit.css');
 
         $mountHtml =
             '<script class="_dumpper-js">' . file_get_contents($baseDir . 'dumpper.js') . '</script>'
