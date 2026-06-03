@@ -222,13 +222,21 @@ class DumpDecoratorsRich implements DumpDecoratorsInterface
         }
 
         if (isset($callee['file'])) {
-            $calleeInfo .= 'Called from ' . DumpHelper::ideLink($callee['file'], $callee['line'] ?? null);
+            $calleeInfo .= 'Called from ' . DumpHelper::ideLink(
+                $callee['file'],
+                $callee['line'] ?? null,
+                DumpHelper::traceLinkText($callee['file'], $callee['line'] ?? null)
+            );
         }
 
         if (!empty($miniTrace)) {
             $traceDisplay = '<ol>';
             foreach ($miniTrace as $step) {
-                $traceDisplay .= '<li>' . DumpHelper::ideLink($step['file'], $step['line']);
+                $traceDisplay .= '<li>' . DumpHelper::ideLink(
+                    $step['file'],
+                    $step['line'],
+                    DumpHelper::traceLinkText($step['file'], $step['line'] ?? null)
+                );
                 if (
                     isset($step['function'])
                     && !in_array($step['function'], ['include', 'include_once', 'require', 'require_once'], true)

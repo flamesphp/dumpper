@@ -4,6 +4,7 @@ namespace Flames\Dumpper\Inc;
 
 use __PHP_Incomplete_Class;
 use ArrayObject;
+use Flames\Dumpper\Attribute\Hidden;
 use Flames\Dumpper\Decorators\DumpDecoratorsRich;
 use Flames\Dumpper\Inc\DumpHelper;
 use Flames\Dumpper\Inc\DumpVariableData;
@@ -67,6 +68,13 @@ class DumpParser
      * @var array<string, array<string, true>>
      */
     private static array $classPublicProps = [];
+
+    /**
+     * Cached hidden property names per class: ['ClassName' => ['prop' => true]].
+     *
+     * @var array<string, array<string, true>>
+     */
+    private static array $classHiddenProps = [];
 
     private static bool $_dealingWithGlobals = false;
 
@@ -396,14 +404,22 @@ class DumpParser
         if (!isset(self::$reflectionClasses[$className])) {
             $rc = new ReflectionClass($className);
             self::$reflectionClasses[$className] = $rc;
-            $props = [];
+            $props       = [];
+            $hiddenProps = [];
             foreach ($rc->getProperties(ReflectionProperty::IS_PUBLIC) as $prop) {
                 $props[$prop->name] = true;
             }
+            foreach ($rc->getProperties() as $prop) {
+                if (self::isPropertyHidden($prop)) {
+                    $hiddenProps[$prop->name] = true;
+                }
+            }
             self::$classPublicProps[$className] = $props;
+            self::$classHiddenProps[$className] = $hiddenProps;
         }
         $reflector   = self::$reflectionClasses[$className];
         $publicProps = self::$classPublicProps[$className];
+        $hiddenProps = self::$classHiddenProps[$className];
 
         if (DumpHelper::isHtmlMode() && $reflector->isUserDefined()) {
             $variableData->type = DumpHelper::ideLink(
@@ -417,11 +433,11 @@ class DumpParser
         $extendedValue = [];
 
         foreach ($castedArray as $key => $value) {
-            $output = self::process($value);
-
+            $propName = $key;
             if (is_string($key) && $key[0] === "\x00") {
-                $access = $key[1] === '*' ? 'protected' : 'private';
-                $key    = substr($key, strrpos($key, "\x00") + 1);
+                $access   = $key[1] === '*' ? 'protected' : 'private';
+                $propName = substr($key, strrpos($key, "\x00") + 1);
+                $key      = $propName;
             } else {
                 $access = 'public';
                 if ($className !== 'stdClass' && !isset($publicProps[$key])) {
@@ -431,6 +447,11 @@ class DumpParser
                 }
             }
 
+            if (isset($hiddenProps[$propName])) {
+                continue;
+            }
+
+            $output           = self::process($value);
             $output->name     = DumpHelper::esc($key);
             $output->access   = $access;
             $output->operator = '->';
@@ -449,6 +470,9 @@ class DumpParser
             }
 
             $name = $property->getName();
+            if (isset($hiddenProps[$name])) {
+                continue;
+            }
             if (isset($extendedValue[$name])) {
                 if ($property->isReadOnly()) {
                     $extendedValue[$name]->access .= ' readonly';
@@ -587,6 +611,11 @@ class DumpParser
     private static function getObjectHash(object $variable): int
     {
         return spl_object_id($variable);
+    }
+
+    private static function isPropertyHidden(ReflectionProperty $property): bool
+    {
+        return $property->getAttributes(Hidden::class) !== [];
     }
 
     /**

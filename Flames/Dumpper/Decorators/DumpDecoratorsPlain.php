@@ -207,7 +207,11 @@ class DumpDecoratorsPlain implements DumpDecoratorsInterface
             $i = 0;
             foreach ($miniTrace as $step) {
                 $traceDisplay .= '        ' . $i + 2 . '. ';
-                $traceDisplay .= DumpHelper::ideLink($step['file'], $step['line']);
+                $traceDisplay .= DumpHelper::ideLink(
+                    $step['file'],
+                    $step['line'],
+                    DumpHelper::traceLinkText($step['file'], $step['line'] ?? null)
+                );
                 $traceDisplay .= PHP_EOL;
                 if ($i++ > 2) {
                     break;
@@ -217,7 +221,11 @@ class DumpDecoratorsPlain implements DumpDecoratorsInterface
 
         return $this->colorize(
                 $lastLine . PHP_EOL
-                . 'Call stack ' . DumpHelper::ideLink($callee['file'], $callee['line'] ?? null)
+                . 'Call stack ' . DumpHelper::ideLink(
+                    $callee['file'],
+                    $callee['line'] ?? null,
+                    DumpHelper::traceLinkText($callee['file'], $callee['line'] ?? null)
+                )
                 . $traceDisplay,
                 'header'
             )

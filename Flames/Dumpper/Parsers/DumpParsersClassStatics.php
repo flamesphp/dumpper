@@ -2,6 +2,7 @@
 
 namespace Flames\Dumpper\Parsers;
 
+use Flames\Dumpper\Attribute\Hidden;
 use Flames\Dumpper\Inc\DumpHelper;
 use Flames\Dumpper\Inc\DumpParser;
 use Flames\Dumpper\Parsers\DumpParserInterface;
@@ -30,6 +31,10 @@ class DumpParsersClassStatics implements DumpParserInterface
         $reflection = new ReflectionClass(get_class($variable));
 
         foreach ($reflection->getProperties(ReflectionProperty::IS_STATIC) as $property) {
+            if ($property->getAttributes(Hidden::class) !== []) {
+                continue;
+            }
+
             if ($property->isProtected()) {
                 $access = 'protected';
             } elseif ($property->isPrivate()) {

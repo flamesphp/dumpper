@@ -63,11 +63,35 @@ class DumpHelper
     }
 
     /**
-     * Shortens an absolute file path by removing the common root shared with the package directory.
+     * Shortens an absolute file path relative to ROOT_PATH when available,
+     * otherwise falls back to the common root shared with the dumpper package.
      */
     public static function shortenPath(string $file): string
     {
         $file = str_replace('\\', '/', $file);
+
+        if (defined('ROOT_PATH')) {
+            $root = rtrim(str_replace('\\', '/', ROOT_PATH), '/') . '/';
+            $candidates = [$file];
+
+            $resolved = realpath($file);
+            if ($resolved !== false) {
+                $candidates[] = str_replace('\\', '/', $resolved);
+            }
+
+            if ($file !== '' && $file[0] !== '/' && !preg_match('#^[A-Za-z]:/#', $file)) {
+                $joined = realpath($root . $file);
+                if ($joined !== false) {
+                    $candidates[] = str_replace('\\', '/', $joined);
+                }
+            }
+
+            foreach ($candidates as $candidate) {
+                if (str_starts_with($candidate, $root)) {
+                    return substr($candidate, strlen($root));
+                }
+            }
+        }
 
         if (self::$projectRootDir === null) {
             self::$projectRootDir = '';
@@ -182,14 +206,46 @@ class DumpHelper
     }
 
     /**
+     * Display label overrides for footer backtrace entries.
+     * Returns null when the file should keep its normal path label.
+     */
+    public static function traceLinkText(string $file, ?int $line): ?string
+    {
+        if (self::isBootTraceFile($file)) {
+            return '[Flames] boot' . ($line ? ':' . $line : '');
+        }
+
+        $path   = self::shortenPath(str_replace('\\', '/', $file));
+        $prefix = 'vendor/flamesphp/';
+
+        if (str_starts_with($path, $prefix)) {
+            $relative = substr($path, strlen($prefix));
+
+            return '[Flames] ' . $relative . ($line ? ':' . $line : '');
+        }
+
+        return null;
+    }
+
+    private static function isBootTraceFile(string $file): bool
+    {
+        return self::shortenPath(str_replace('\\', '/', $file)) === 'public/index.php';
+    }
+
+    /**
      * Builds a clickable IDE link for a file:line reference.
      */
     public static function ideLink(string $file, ?int $line, ?string $linkText = null): string
     {
         $mode = Dump::enabled();
-        $file = self::shortenPath($file);
+        $absoluteFile = str_replace('\\', '/', $file);
+        $resolved     = realpath($file);
+        if ($resolved !== false) {
+            $absoluteFile = str_replace('\\', '/', $resolved);
+        }
+        $displayFile = self::shortenPath($absoluteFile);
 
-        $fileLine = $file;
+        $fileLine = $displayFile;
         if ($line) {
             $fileLine .= ':' . $line;
         } else {
@@ -197,16 +253,16 @@ class DumpHelper
         }
 
         if (!self::isHtmlMode()) {
-            return $fileLine;
+            return $linkText ?? $fileLine;
         }
 
-        $linkText = $linkText ? self::esc($linkText) : self::esc($fileLine);
+        $linkText = $linkText !== null ? self::esc($linkText) : self::esc($fileLine);
 
         if (!Dump::$editor) {
             return $linkText;
         }
 
-        $realPath = $file;
+        $realPath = $displayFile;
 
         if (class_exists('Flames\Environment', false)) {
             $environment = \Flames\Environment::default();
@@ -215,7 +271,7 @@ class DumpHelper
 
             if (!empty($localPath) && !empty($remotePath)) {
                 foreach (get_included_files() as $_file) {
-                    if (str_ends_with($_file, $file)) {
+                    if (str_ends_with($_file, $displayFile) || str_ends_with($_file, $absoluteFile)) {
                         $realPath = $_file;
                         break;
                     }

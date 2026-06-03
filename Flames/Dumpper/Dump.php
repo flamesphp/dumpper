@@ -400,8 +400,12 @@ class Dump
             } else {
                 foreach ($args as $k => $argument) {
                     DumpParser::reset();
+                    $name = empty($names[$k]) ? '???' : $names[$k];
+                    if (self::_isDumpLiteralArgName($name)) {
+                        $name = null;
+                    }
                     $output .= $decorator->decorate(
-                        DumpParser::process($argument, empty($names[$k]) ? '???' : $names[$k])
+                        DumpParser::process($argument, $name)
                     );
                 }
             }
@@ -456,6 +460,27 @@ class Dump
         echo $output;
 
         return 5463;
+    }
+
+    /**
+     * Literal values passed directly to dump() (e.g. dump('oi'), dump(123)) are
+     * masked as '...' during source parsing — omit the redundant name label.
+     */
+    private static function _isDumpLiteralArgName(string $name): bool
+    {
+        if ($name === '???') {
+            return false;
+        }
+
+        if (preg_match('/^[\'"]\.\.\.[\'"]$/', $name)) {
+            return true;
+        }
+
+        if (preg_match('/^-?(?:0x[\da-f]+|0b[01]+|0[\da-f]*|\d+(?:_\d+)*(?:\.\d+(?:_\d+)*)?(?:[eE][+-]?\d+)?)$/i', $name)) {
+            return true;
+        }
+
+        return in_array(strtolower($name), ['true', 'false', 'null'], true);
     }
 
     /**
