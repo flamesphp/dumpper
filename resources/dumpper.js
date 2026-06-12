@@ -171,6 +171,40 @@ if ("undefined" == typeof _dumpperInitialized) {
             for (; e && !s.l(e, "_dumpper"); ) e = e.parentNode;
             return e || null;
         },
+        pageReady: document.readyState === "complete",
+        pendingAssetCleanup: false,
+        maybeCleanupAssets: function () {
+            if (document.querySelector("._dumpper")) {
+                s.pendingAssetCleanup = false;
+                return;
+            }
+            if (!s.pageReady) {
+                s.pendingAssetCleanup = true;
+                return;
+            }
+            s.removeAssets();
+        },
+        removeAssets: function () {
+            s.pendingAssetCleanup = false;
+            s.u("._dumpper-js, ._dumpper-css", function (el) {
+                el.parentNode && el.parentNode.removeChild(el);
+            });
+            if (-1 !== s.i) s.R.C(-1);
+        },
+        onPageReady: function () {
+            s.pageReady = true;
+            if (s.pendingAssetCleanup) s.maybeCleanupAssets();
+            const e = Array.prototype.slice.call(document.querySelectorAll("._dumpper-microtime"), 0);
+            let n = 1 / 0,
+                i = -1 / 0;
+            e.forEach(function (e) {
+                (e = parseFloat(e.innerHTML)), n > e && (n = e), i < e && (i = e);
+            }),
+                e.forEach(function (e) {
+                    var t = 1 - (parseFloat(e.innerHTML) - n) / (i - n);
+                    e.style.background = "hsl(" + Math.round(120 * t) + ",60%,70%)";
+                });
+        },
         close: function (e) {
             if (!e || e._dumpperClosing) return;
             e._dumpperClosing = true;
@@ -188,6 +222,7 @@ if ("undefined" == typeof _dumpperInitialized) {
                 e._dumpperCloseDone = true;
                 e.remove();
                 if (-1 !== s.i) s.T();
+                s.maybeCleanupAssets();
             };
 
             const collapseHeight = function () {
@@ -386,16 +421,9 @@ if ("undefined" == typeof _dumpperInitialized) {
                 }
             }
         }),
-        window.addEventListener("load", function () {
-            const e = Array.prototype.slice.call(document.querySelectorAll("._dumpper-microtime"), 0);
-            let n = 1 / 0,
-                i = -1 / 0;
-            e.forEach(function (e) {
-                (e = parseFloat(e.innerHTML)), n > e && (n = e), i < e && (i = e);
-            }),
-                e.forEach(function (e) {
-                    var t = 1 - (parseFloat(e.innerHTML) - n) / (i - n);
-                    e.style.background = "hsl(" + Math.round(120 * t) + ",60%,70%)";
-                });
-        });
+        s.pageReady
+            ? s.onPageReady()
+            : window.addEventListener("load", function () {
+                  s.onPageReady();
+              });
 }

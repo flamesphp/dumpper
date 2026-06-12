@@ -1,13 +1,15 @@
 <?php
+declare(strict_types=1);
+
 
 namespace Flames\Dumpper\Parsers;
 
 use Flames\Dumpper\Inc\DumpHelper;
 use Flames\Dumpper\Parsers\DumpParserInterface;
-use Flames\Model;
+use Flames\Orm\Model;
 
 /**
- * Extracts model data and metadata from Flames\Model instances.
+ * Extracts model data and metadata from Flames\Orm\Model instances.
  *
  * @internal
  */

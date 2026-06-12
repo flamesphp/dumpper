@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 
 namespace Flames\Dumpper\Inc;
 
@@ -63,12 +65,24 @@ class DumpHelper
     }
 
     /**
+     * Resolves virtual source paths (e.g. subset stream wrappers) to real files on disk.
+     */
+    public static function resolveSourcePath(string $file): string
+    {
+        if (str_starts_with($file, 'flames://')) {
+            return substr($file, 9);
+        }
+
+        return $file;
+    }
+
+    /**
      * Shortens an absolute file path relative to ROOT_PATH when available,
      * otherwise falls back to the common root shared with the dumpper package.
      */
     public static function shortenPath(string $file): string
     {
-        $file = str_replace('\\', '/', $file);
+        $file = self::resolveSourcePath(str_replace('\\', '/', $file));
 
         if (defined('ROOT_PATH')) {
             $root = rtrim(str_replace('\\', '/', ROOT_PATH), '/') . '/';
@@ -211,6 +225,8 @@ class DumpHelper
      */
     public static function traceLinkText(string $file, ?int $line): ?string
     {
+        $file = self::resolveSourcePath($file);
+
         if (self::isBootTraceFile($file)) {
             return '[Flames] boot' . ($line ? ':' . $line : '');
         }
@@ -238,6 +254,7 @@ class DumpHelper
     public static function ideLink(string $file, ?int $line, ?string $linkText = null): string
     {
         $mode = Dump::enabled();
+        $file = self::resolveSourcePath($file);
         $absoluteFile = str_replace('\\', '/', $file);
         $resolved     = realpath($file);
         if ($resolved !== false) {

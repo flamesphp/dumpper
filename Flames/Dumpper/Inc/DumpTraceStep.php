@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 
 namespace Flames\Dumpper\Inc;
 
@@ -130,12 +132,17 @@ class DumpTraceStep
             empty($step['file'])
             || !isset($step['line'])
             || Dump::enabled() !== Dump::MODE_RICH
-            || !is_readable($step['file'])
         ) {
             return null;
         }
 
-        $file        = fopen($step['file'], 'r');
+        $sourceFile = DumpHelper::resolveSourcePath($step['file']);
+
+        if (!is_readable($sourceFile)) {
+            return null;
+        }
+
+        $file        = fopen($sourceFile, 'r');
         $line        = $step['line'];
         $readingLine = 0;
         $range       = ['start' => $line - 7, 'end' => $line + 7];

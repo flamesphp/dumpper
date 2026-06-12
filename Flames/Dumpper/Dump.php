@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 
 namespace Flames\Dumpper;
 
@@ -512,6 +514,7 @@ class Dump
 
             if (isset($step['file'], $step['line'])) {
                 unset($step['object'], $step['args']);
+                $step['file'] = DumpHelper::resolveSourcePath($step['file']);
                 array_unshift($miniTrace, $step);
             }
 
@@ -519,11 +522,17 @@ class Dump
         }
         $callee = $step;
 
+        if (isset($callee['file'])) {
+            $callee['file'] = DumpHelper::resolveSourcePath($callee['file']);
+        }
+
         if (!isset($callee['file']) || !is_readable($callee['file'])) {
             return [null, null, $callee, $previousCaller, $miniTrace];
         }
 
-        $file   = fopen($callee['file'], 'r');
+        $sourceFile = $callee['file'];
+
+        $file   = fopen($sourceFile, 'r');
         $line   = 0;
         $source = '';
         while (($row = fgets($file)) !== false) {
@@ -675,6 +684,9 @@ class Dump
             if (!is_array($step) || !isset($step['function'])) {
                 return false;
             }
+            if (isset($step['file'])) {
+                $step['file'] = DumpHelper::resolveSourcePath($step['file']);
+            }
             if (!$fileFound && isset($step['file']) && file_exists($step['file'])) {
                 $fileFound = true;
             }
@@ -697,7 +709,7 @@ class Dump
             if (DumpHelper::stepIsInternal($step)) {
                 if (isset($step['file'], $step['line'])) {
                     $lastStep = [
-                        'file'     => $step['file'],
+                        'file'     => DumpHelper::resolveSourcePath($step['file']),
                         'line'     => $step['line'],
                         'function' => '',
                     ];
