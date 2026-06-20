@@ -443,7 +443,7 @@ class DumpParser
             } else {
                 $access = 'public';
                 if ($className !== 'stdClass' && !isset($publicProps[$key])) {
-                    if ($className !== 'Flames\Collection\Arr') {
+                    if (is_a($className, 'Flames\Collection\Arr', true) === false) {
                         $access .= ' (dynamically added)';
                     }
                 }

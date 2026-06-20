@@ -119,6 +119,7 @@ class Dump
     /** @var array<string, bool> */
     public static array $enabledParsers = [
         'DumpParsersFlamesModel'       => true,
+        'DumpParsersFlamesCollection'  => true,
         'DumpParsersSmarty'            => true,
         'DumpParsersSplFileInfo'       => true,
         'DumpParsersClosure'           => true,
