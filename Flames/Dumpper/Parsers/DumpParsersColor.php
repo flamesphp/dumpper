@@ -124,7 +124,7 @@ HTML;
             $colors = strlen($color) === 6
                 ? str_split($color, 2)
                 : [$color[0] . $color[0], $color[1] . $color[1], $color[2] . $color[2]];
-            $decimalColors = array_map('hexdec', $colors);
+            $decimalColors = array_map(hexdec(...), $colors);
         } elseif (str_starts_with($color, 'rgb')) {
             $variants['rgb'] = $color;
             preg_match_all('#([0-9.%]+)#', $color, $matches);

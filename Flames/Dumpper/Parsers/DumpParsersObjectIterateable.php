@@ -26,7 +26,7 @@ class DumpParsersObjectIterateable implements DumpParserInterface
             !DumpHelper::isRichMode()
             || !is_object($variable)
             || !$variable instanceof Traversable
-            || stripos($class = get_class($variable), 'zend') !== false
+            || stripos($class = $variable::class, 'zend') !== false
             || !str_starts_with($class, 'DOMN')
         ) {
             return false;

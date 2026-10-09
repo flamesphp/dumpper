@@ -26,7 +26,7 @@ class DumpParsersBlacklist implements DumpParserInterface
             return false;
         }
 
-        $className = get_class($variable);
+        $className = $variable::class;
         foreach (Dump::$classNameBlacklist as $item) {
             if (preg_match($item, $className)) {
                 $varData->type = $className . ' [skipped]';

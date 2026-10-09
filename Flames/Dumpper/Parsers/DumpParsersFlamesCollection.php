@@ -13,7 +13,7 @@ use Flames\Dumpper\Parsers\DumpParserInterface;
  */
 class DumpParsersFlamesCollection implements DumpParserInterface
 {
-    private const COLLECTION_ARR = 'Flames\Collection\Arr';
+    private const string COLLECTION_ARR = 'Flames\Collection\Arr';
 
     public function replacesAllOtherParsers(): bool
     {
@@ -25,7 +25,7 @@ class DumpParsersFlamesCollection implements DumpParserInterface
         if (
             !is_object($variable)
             || !class_exists(self::COLLECTION_ARR, false)
-            || !($variable instanceof self::COLLECTION_ARR)
+            || !is_a($variable, self::COLLECTION_ARR)
         ) {
             return false;
         }

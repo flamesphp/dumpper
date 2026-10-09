@@ -230,9 +230,7 @@ class Dump
      */
     public static function trace(?array $trace = null): mixed
     {
-        if ($trace === null) {
-            $trace = debug_backtrace(DEBUG_BACKTRACE_PROVIDE_OBJECT);
-        }
+        $trace ??= debug_backtrace(DEBUG_BACKTRACE_PROVIDE_OBJECT);
 
         return self::dump($trace);
     }
@@ -255,6 +253,11 @@ class Dump
         try {
             return self::doDump(...$args);
         } catch (\Throwable $e) {
+            if (\Flames\Env\Env::get('ENVIRONMENT') === 'development') {
+                echo '<pre>Dump error: '
+                    . htmlspecialchars($e->getMessage(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
+                    . '</pre>';
+            }
         }
 
         return 5463;
@@ -625,7 +628,7 @@ class Dump
         }
 
         $names = explode(',', preg_replace("[\x07+]", '...', $paramsString));
-        $names = array_map('trim', $names);
+        $names = array_map(trim(...), $names);
 
         if ($insideTemplateDetected) {
             $callee['file'] = $insideTemplateDetected;
@@ -691,14 +694,7 @@ class Dump
             if (!$fileFound && isset($step['file']) && file_exists($step['file'])) {
                 $fileFound = true;
             }
-
-            $valid = false;
-            foreach ($traceFields as $element) {
-                if (isset($step[$element])) {
-                    $valid = true;
-                    break;
-                }
-            }
+            $valid = array_any($traceFields, fn($element) => isset($step[$element]));
             if (!$valid) {
                 return false;
             }

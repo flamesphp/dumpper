@@ -40,7 +40,7 @@ class DumpParsersDateTime implements DumpParserInterface
         $format .= ' (P)';
 
         $varData->value = $variable->format($format);
-        $varData->type  = get_class($variable);
+        $varData->type  = $variable::class;
 
         return null;
     }

@@ -43,9 +43,7 @@ class DumpParsersSmarty implements DumpParserInterface
         $varData->addTabToView($variable, 'Assigned to view', $assigned);
         $varData->addTabToView($variable, 'Assigned globally', $globalAssigns);
         $varData->addTabToView($variable, 'Configuration', [
-            'Compiled files stored in' => isset($variable->compile_dir)
-                ? $variable->compile_dir
-                : $variable->getCompileDir(),
+            'Compiled files stored in' => $variable->compile_dir ?? $variable->getCompileDir(),
         ]);
 
         return null;

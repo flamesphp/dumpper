@@ -118,9 +118,7 @@ class DumpParser
             }
             self::$parsingAlternative[$parserClass] = true;
 
-            if (!isset(self::$parserInstances[$parserClass])) {
-                self::$parserInstances[$parserClass] = new ('Flames\Dumpper\Parsers\\' . $parserClass)();
-            }
+            self::$parserInstances[$parserClass] ??= new ('Flames\Dumpper\Parsers\\' . $parserClass)();
             $parser      = self::$parserInstances[$parserClass];
             $parseResult = $parser->parse($variable, $varData);
 
@@ -316,7 +314,7 @@ class DumpParser
                         $output .= '<td class="_dumpper-empty"><u>*REDACTED*</u></td>';
                         continue;
                     }
-                    if (!array_key_exists($key, $row)) {
+                    if (!array_key_exists((string) $key, $row)) {
                         $output .= '<td class="_dumpper-empty"></td>';
                         continue;
                     }
@@ -379,7 +377,7 @@ class DumpParser
     {
         $hash        = self::getObjectHash($variable);
         $castedArray = (array)$variable;
-        $className   = get_class($variable);
+        $className   = $variable::class;
 
         $variableData->type = $className;
         $variableData->size = count($castedArray);

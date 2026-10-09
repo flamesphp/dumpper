@@ -30,7 +30,7 @@ class DumpParsersClassStatics implements DumpParserInterface
         }
 
         $statics    = [];
-        $reflection = new ReflectionClass(get_class($variable));
+        $reflection = new ReflectionClass($variable::class);
 
         foreach ($reflection->getProperties(ReflectionProperty::IS_STATIC) as $property) {
             if ($property->getAttributes(Hidden::class) !== []) {

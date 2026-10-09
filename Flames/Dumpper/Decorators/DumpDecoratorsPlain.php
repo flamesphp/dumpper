@@ -38,7 +38,7 @@ class DumpDecoratorsPlain implements DumpDecoratorsInterface
     {
         $output = '';
         if ($level === 0) {
-            $name          = $varData->name ? $varData->name : '';
+            $name          = $varData->name ?: '';
             $varData->name = null;
             $output       .= $this->title((string)$name);
         }
@@ -50,7 +50,7 @@ class DumpDecoratorsPlain implements DumpDecoratorsInterface
         if (Dump::enabled() === Dump::MODE_CLI) {
             for ($i = 0; $i < $level; $i++) {
                 if (!array_key_exists($i, self::$levelColors)) {
-                    self::$levelColors[$i] = rand(1, 231);
+                    self::$levelColors[$i] = random_int(1, 231);
                 }
                 $color  = self::$levelColors[$i];
                 $space .= "\x1b[38;5;{$color}m┆\x1b[0m   ";

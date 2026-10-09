@@ -39,7 +39,7 @@ class DumpParsersSplFileInfo implements DumpParserInterface
     protected function run(mixed &$variable, mixed $varData, SplFileInfo $fileInfo): mixed
     {
         $varData->value = '"' . DumpHelper::esc($fileInfo->getPathname()) . '"';
-        $varData->type  = get_class($fileInfo);
+        $varData->type  = $fileInfo::class;
 
         if (!$fileInfo->getPathname() || !$fileInfo->getRealPath()) {
             $varData->size = 'invalid path';
@@ -69,7 +69,7 @@ class DumpParsersSplFileInfo implements DumpParserInterface
             $flags[] = (($perms & 0x0002) ? 'w' : '-');
             $flags[] = (($perms & 0x0001) ? (($perms & 0x0200) ? 't' : 'x') : (($perms & 0x0200) ? 'T' : '-'));
 
-            $varData->type = get_class($fileInfo);
+            $varData->type = $fileInfo::class;
 
             if ($type === 'Directory') {
                 $name = 'Existing Directory';
@@ -87,7 +87,7 @@ class DumpParsersSplFileInfo implements DumpParserInterface
             }
 
             if (DumpHelper::isRichMode()) {
-                $extra['flags'] = implode($flags);
+                $extra['flags'] = implode('', $flags);
                 if ($fileInfo->getGroup() || $fileInfo->getOwner()) {
                     $extra['group&owner'] = $fileInfo->getGroup() . ':' . $fileInfo->getOwner();
                 }

@@ -54,14 +54,7 @@ class DumpTraceStep
         if ($stepNumber < Dump::$minimumTraceStepsToShowFull) {
             return false;
         }
-
-        foreach (Dump::$traceBlacklist as $blacklistedPath) {
-            if (preg_match($blacklistedPath, $step['file'])) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any(Dump::$traceBlacklist, fn($blacklistedPath) => preg_match($blacklistedPath, $step['file']));
     }
 
     private function getFileAndLine(array $step): string
