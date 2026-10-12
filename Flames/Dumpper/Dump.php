@@ -278,7 +278,7 @@ class Dump
 
         [$names, $modifiers, $callee, $previousCaller, $miniTrace] = self::_getCalleeInfo();
 
-        $hasMods  = $modifiers !== null && $modifiers !== '';
+        $hasMods  = is_string($modifiers) && $modifiers !== '';
         $modPrint = $hasMods && str_contains($modifiers, 'print');
         $modTilde = $hasMods && str_contains($modifiers, '~');
         $modMinus = $hasMods && str_contains($modifiers, '-');
@@ -574,7 +574,7 @@ class Dump
         $bracket    = end($matches[3]);
 
         if (empty($callToDump)) {
-            return [[], $modifiers, $callee, $previousCaller, $miniTrace];
+            return [[], null, $callee, $previousCaller, $miniTrace];
         }
 
         $modifiers    = str_replace("\x07", '', $modifiers[0]);
